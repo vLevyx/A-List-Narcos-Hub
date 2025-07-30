@@ -14,10 +14,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background-primary disabled:pointer-events-none disabled:opacity-50'
     
     const variants = {
-      default: 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white hover:from-accent-secondary hover:to-accent-primary shadow-lg hover:shadow-xl',
-      outline: 'border-2 border-accent-primary text-accent-primary hover:bg-accent-primary hover:text-white',
-      ghost: 'text-accent-primary hover:bg-accent-primary/10',
-      destructive: 'bg-red-600 text-white hover:bg-red-700'
+      default: 'bg-gradient-purple text-white hover:shadow-lg hover:shadow-purple-500/25 transform hover:scale-[1.02] active:scale-100',
+      outline: 'border-2 border-accent-primary text-accent-primary hover:bg-accent-primary hover:text-white hover:shadow-lg hover:shadow-purple-500/25',
+      ghost: 'text-accent-primary hover:bg-accent-primary/10 hover:text-accent-light',
+      destructive: 'bg-red-600 text-white hover:bg-red-700 hover:shadow-lg hover:shadow-red-500/25'
     }
     
     const sizes = {
@@ -33,6 +33,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           variants[variant],
           sizes[size],
           loading && 'cursor-not-allowed',
+          'btn-transition',
           className
         )}
         disabled={disabled || loading}

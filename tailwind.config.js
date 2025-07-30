@@ -10,11 +10,18 @@ module.exports = {
       colors: {
         'background-primary': '#0f0f0f',
         'background-secondary': '#1a1a1a',
-        'accent-primary': '#ff6b00',
-        'accent-secondary': '#ff8533',
+        'accent-primary': '#8b5cf6',
+        'accent-secondary': '#a78bfa',
+        'accent-light': '#c4b5fd',
         'text-primary': '#ffffff',
         'text-secondary': '#a0a0a0',
         'border-primary': 'rgba(255, 255, 255, 0.1)',
+        'purple': {
+          400: '#a78bfa',
+          500: '#8b5cf6',
+          600: '#7c3aed',
+          700: '#6d28d9',
+        }
       },
       fontFamily: {
         outfit: ['var(--font-outfit)', 'Outfit', 'system-ui', 'sans-serif'],
@@ -23,6 +30,7 @@ module.exports = {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'pulse-slow': 'pulse 3s ease-in-out infinite',
+        'glow': 'glow 2s ease-in-out infinite alternate',
       },
       keyframes: {
         fadeIn: {
@@ -33,6 +41,14 @@ module.exports = {
           '0%': { transform: 'translateY(10px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
+        glow: {
+          '0%': { boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)' },
+          '100%': { boxShadow: '0 0 30px rgba(139, 92, 246, 0.6)' },
+        },
+      },
+      backgroundImage: {
+        'gradient-purple': 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 50%, #c4b5fd 100%)',
+        'gradient-dark': 'linear-gradient(135deg, #1a1a1a 0%, #2d1b3d 50%, #1a1a1a 100%)',
       },
     },
   },
