@@ -20,7 +20,6 @@ export function Footer() {
       links: [
         { label: "Discord Server", href: "#", external: true },
         { label: "Documentation", href: "#" },
-        { label: "Status Page", href: "#", external: true },
       ]
     },
     {
@@ -99,16 +98,11 @@ export function Footer() {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-6">
               <p className="text-text-secondary text-sm">
-                © {currentYear} A-List Narcos Hub. All rights reserved.
+                © {currentYear} The A-List. All rights reserved.
               </p>
               <div className="flex items-center space-x-4">
-                <span className="text-text-secondary text-xs">Built with</span>
+                <span className="text-text-secondary text-xs">Built with 💜 by Levy </span>
                 <div className="flex items-center space-x-1 text-xs text-accent-primary">
-                  <span>Next.js</span>
-                  <span>•</span>
-                  <span>Supabase</span>
-                  <span>•</span>
-                  <span>Tailwind</span>
                 </div>
               </div>
             </div>
@@ -116,7 +110,7 @@ export function Footer() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 text-xs text-text-secondary">
                 <div className="w-2 h-2 bg-accent-primary rounded-full"></div>
-                <span>v1.0.0</span>
+                <span>v0.0.1 | DEVELOPMENT</span>
               </div>
               
               {/* Security Badge */}

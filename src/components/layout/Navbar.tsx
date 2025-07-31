@@ -104,7 +104,7 @@ export function Navbar() {
                 A-List Narcos
               </span>
               <span className="text-xs text-text-secondary -mt-1 group-hover:text-accent-light transition-colors">
-                Roleplay Hub
+                Hub
               </span>
             </div>
           </Link>

@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import type { User } from '@supabase/supabase-js'
 
-// Fix: Only keep ONE cn function
+// Combine class names with Tailwind merge
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -95,126 +95,42 @@ export function isUserAdmin(user: User | null): boolean {
   const discordId = getDiscordId(user)
   const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
   
-  return discordId ? adminIds.includes(discordId) : false
+  return discordId ? adminIds.includes(discordId.trim()) : false
 }
 
-// Check if user has middleman privileges
-export function isUserMiddleman(user: User | null): boolean {
-  if (!user) return false
-  
-  // For now, middleman = admin, but you can expand this
-  return isUserAdmin(user)
+// Format number utility
+export function formatNumber(num: number): string {
+  return new Intl.NumberFormat().format(num)
 }
 
-// Connection speed detection
-export function isSlowConnection(): boolean {
-  if (typeof navigator === 'undefined') return false
-  
-  const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection
-  
-  if (!connection) return false
-  
-  // Consider 2G or slow-2g as slow
-  return connection.effectiveType === '2g' || connection.effectiveType === 'slow-2g'
-}
-
-// Generate random ID
-export function generateId(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36)
-}
-
-// Debounce utility
-export function debounce<T extends (...args: any[]) => void>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout
-  
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => func(...args), wait)
-  }
-}
-
-// Validate Discord ID format
-export function isValidDiscordId(id: string): boolean {
-  return /^\d{17,19}$/.test(id)
-}
-
-// Safe JSON parse
-export function safeJsonParse<T>(json: string, fallback: T): T {
-  try {
-    return JSON.parse(json)
-  } catch {
-    return fallback
-  }
-}
-
-// Local storage helpers with error handling
-export function getFromStorage(key: string, fallback: any = null) {
-  if (typeof window === 'undefined') return fallback
+// Simple storage utilities (fallback for localStorage)
+export function getFromStorage(key: string): any {
+  if (typeof window === 'undefined') return null
   
   try {
     const item = localStorage.getItem(key)
-    return item ? JSON.parse(item) : fallback
+    return item ? JSON.parse(item) : null
   } catch {
-    return fallback
+    return null
   }
 }
 
-export function setToStorage(key: string, value: any): boolean {
-  if (typeof window === 'undefined') return false
+export function setToStorage(key: string, value: any): void {
+  if (typeof window === 'undefined') return
   
   try {
     localStorage.setItem(key, JSON.stringify(value))
-    return true
   } catch {
-    return false
+    // Ignore storage errors
   }
 }
 
-export function removeFromStorage(key: string): boolean {
-  if (typeof window === 'undefined') return false
+export function removeFromStorage(key: string): void {
+  if (typeof window === 'undefined') return
   
   try {
     localStorage.removeItem(key)
-    return true
   } catch {
-    return false
+    // Ignore storage errors
   }
-}
-
-// Error formatting
-export function formatError(error: any): string {
-  if (typeof error === 'string') return error
-  if (error?.message) return error.message
-  if (error?.error_description) return error.error_description
-  return 'An unknown error occurred'
-}
-
-// URL validation
-export function isValidUrl(string: string): boolean {
-  try {
-    new URL(string)
-    return true
-  } catch {
-    return false
-  }
-}
-
-// Number formatting
-export function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M'
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  }
-  return num.toString()
-}
-
-// Percentage calculation
-export function calculatePercentage(value: number, total: number): number {
-  if (total === 0) return 0
-  return Math.round((value / total) * 100 * 100) / 100
 }

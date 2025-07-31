@@ -10,6 +10,26 @@
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
+    ],
+    "/starter-guide/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/starter-guide/page.js"
+    ],
+    "/starter-guide/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/starter-guide/layout.js"
+    ],
+    "/store-prices/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/store-prices/page.js"
+    ],
+    "/store-prices/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/store-prices/layout.js"
     ]
   }
 }

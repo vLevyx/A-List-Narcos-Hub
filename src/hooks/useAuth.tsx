@@ -1,249 +1,135 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { getDiscordId, getUsername, isUserAdmin, getFromStorage, setToStorage, removeFromStorage } from '@/lib/utils'
-import { withTimeout } from '@/lib/timeout'
+import { getDiscordId, getUsername, isUserAdmin } from '@/lib/utils'
 import type { User, Session } from '@supabase/supabase-js'
 
-// Add the UserWithAccess type definition here
-interface UserWithAccess {
-  id: string
-  discord_id: string
-  username: string | null
-  created_at: string
-  revoked: boolean
-  last_login: string | null
-  login_count: number
-  hub_trial: boolean
-  trial_expiration: string | null
-  hasAccess: boolean
-  isTrialActive: boolean
-}
-
-interface ExtendedAuthState {
+interface AuthState {
   user: User | null
   session: Session | null
   loading: boolean
   hasAccess: boolean
   isTrialActive: boolean
   isAdmin: boolean
-  canViewAnalytics: boolean
-  canManageUsers: boolean
 }
 
-interface AuthContextType extends ExtendedAuthState {
+interface AuthContextType extends AuthState {
   signInWithDiscord: () => Promise<void>
   signOut: () => Promise<void>
   refreshUserData: () => Promise<void>
-  error: Error | null
-  isRefreshing: boolean
-  lastUpdated: number | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const CACHE_KEY = 'auth_cache'
-const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
-const REFRESH_INTERVAL = 15 * 60 * 1000 // 15 minutes
-const HEALTH_CHECK_INTERVAL = 60 * 1000 // 1 minute
-const MAX_RETRY_ATTEMPTS = 3
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const supabase = createClient()
   
-  const [state, setState] = useState<ExtendedAuthState>({
+  const [state, setState] = useState<AuthState>({
     user: null,
     session: null,
     loading: true,
     hasAccess: false,
     isTrialActive: false,
     isAdmin: false,
-    canViewAnalytics: false,
-    canManageUsers: false,
   })
 
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
-  const [error, setError] = useState<Error | null>(null)
-  const [hasValidCache, setHasValidCache] = useState(false)
-
-  const retryAttemptsRef = useRef(0)
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  const supabase = createClient()
-
-  // Cache management
-  const invalidateCache = useCallback(() => {
-    removeFromStorage(CACHE_KEY)
-    setHasValidCache(false)
-  }, [])
-
-  // Server-side admin checking via RLS
-  const checkAdminStatusSecure = useCallback(async (user?: User): Promise<boolean> => {
-    if (!user && !state.user) return false
-    const currentUser = user || state.user
-    if (!currentUser) return false
-    
+  // Sign in with Discord
+  const signInWithDiscord = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc('is_admin')
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'discord',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        }
+      })
       
       if (error) {
-        console.error('Error checking admin status:', error)
-        return false
+        console.error('Error signing in:', error)
+        throw error
+      }
+    } catch (error) {
+      console.error('Sign in failed:', error)
+      throw error
+    }
+  }, [supabase.auth])
+
+  // Sign out
+  const signOut = useCallback(async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Error signing out:', error)
+        throw error
       }
       
-      return data === true
+      setState({
+        user: null,
+        session: null,
+        loading: false,
+        hasAccess: false,
+        isTrialActive: false,
+        isAdmin: false,
+      })
+      
+      router.push('/')
     } catch (error) {
-      console.error('Failed to check admin status:', error)
-      return false
+      console.error('Sign out failed:', error)
+      throw error
     }
-  }, [state.user, supabase])
+  }, [supabase.auth, router])
 
-  // Client-side fallback (UI only)
-  const checkAdminStatusFallback = useCallback((user?: User): boolean => {
-    const currentUser = user || state.user
-    if (!currentUser) return false
-    return isUserAdmin(currentUser)
-  }, [state.user])
-
-  // Combined admin checking with server-first approach
-  const checkAdminStatus = useCallback(async (user?: User): Promise<boolean> => {
-    try {
-      // Try server-side check first
-      const serverResult = await withTimeout(checkAdminStatusSecure(user), 3000)
-      return serverResult
-    } catch (error) {
-      console.warn('Server admin check failed, using fallback:', error)
-      // Fall back to client-side check for UI purposes only
-      return checkAdminStatusFallback(user)
-    }
-  }, [checkAdminStatusSecure, checkAdminStatusFallback])
-
-  // Check user access and trial status
+  // Check user access status
   const checkUserAccess = useCallback(async (user: User): Promise<{
     hasAccess: boolean
     isTrialActive: boolean
-    userData?: UserWithAccess
   }> => {
-    try {
-      const discordId = getDiscordId(user)
-      if (!discordId) return { hasAccess: false, isTrialActive: false }
+    const discordId = getDiscordId(user)
+    
+    if (!discordId) {
+      return { hasAccess: false, isTrialActive: false }
+    }
 
-      // Fix: Execute the query directly without withTimeout for now
+    try {
       const { data: userData, error } = await supabase
         .from('users')
-        .select('*')
+        .select('revoked, hub_trial, trial_expiration')
         .eq('discord_id', discordId)
         .single()
 
       if (error || !userData) {
+        console.error('Error fetching user data:', error)
         return { hasAccess: false, isTrialActive: false }
       }
 
-      // Check if revoked
-      if (userData.revoked) {
-        return { 
-          hasAccess: false, 
-          isTrialActive: false, 
-          userData: { ...userData, hasAccess: false, isTrialActive: false }
-        }
+      const hasAccess = !userData.revoked
+      let isTrialActive = false
+
+      if (userData.hub_trial && userData.trial_expiration) {
+        const trialExpiration = new Date(userData.trial_expiration)
+        const now = new Date()
+        isTrialActive = now < trialExpiration && hasAccess
       }
 
-      // Check trial status
-      const now = new Date()
-      const isTrialActive = userData.hub_trial && 
-        userData.trial_expiration && 
-        new Date(userData.trial_expiration) > now
-
-      const hasAccess = !userData.revoked && (isTrialActive || await checkAdminStatus(user))
-
-      return { 
-        hasAccess, 
-        isTrialActive, 
-        userData: { ...userData, hasAccess, isTrialActive }
-      }
+      return { hasAccess, isTrialActive }
     } catch (error) {
       console.error('Error checking user access:', error)
       return { hasAccess: false, isTrialActive: false }
     }
-  }, [supabase, checkAdminStatus])
-
-  // Upsert user login
-  const upsertUserLogin = useCallback(async (user: User) => {
-    try {
-      const discordId = getDiscordId(user)
-      const username = getUsername(user)
-      
-      if (!discordId) return
-
-      // Fix: Execute the RPC directly without withTimeout for now
-      await supabase.rpc('upsert_user_login', {
-        target_discord_id: discordId,
-        user_name: username
-      })
-    } catch (error) {
-      console.error('Error upserting user login:', error)
-    }
   }, [supabase])
 
-  // Load cached auth state
-  const loadFromCache = useCallback(() => {
-    try {
-      const cached = getFromStorage(CACHE_KEY)
-      if (!cached || !cached.timestamp) return false
-
-      const cacheAge = Date.now() - cached.timestamp
-      if (cacheAge > CACHE_TTL) {
-        invalidateCache()
-        return false
-      }
-
-      setState(prev => ({
-        ...prev,
-        ...cached.state,
-        loading: false
-      }))
-      setLastUpdated(cached.timestamp)
-      setHasValidCache(true)
-      return true
-    } catch (error) {
-      console.error('Error loading from cache:', error)
-      invalidateCache()
-      return false
-    }
-  }, [invalidateCache])
-
-  // Save to cache
-  const saveToCache = useCallback((authState: ExtendedAuthState) => {
-    try {
-      const cacheData = {
-        state: authState,
-        timestamp: Date.now()
-      }
-      setToStorage(CACHE_KEY, cacheData)
-      setLastUpdated(cacheData.timestamp)
-      setHasValidCache(true)
-    } catch (error) {
-      console.error('Error saving to cache:', error)
-    }
-  }, [])
-
   // Refresh user data
-  const refreshUserDataInternal = useCallback(async () => {
-    if (isRefreshing) return
-
+  const refreshUserData = useCallback(async () => {
     try {
-      setIsRefreshing(true)
-      setError(null)
-
-      const { data: { session }, error: sessionError } = await withTimeout(
-        supabase.auth.getSession()
-      )
-
-      if (sessionError) throw sessionError
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.error('Error getting session:', error)
+        setState(prev => ({ ...prev, loading: false }))
+        return
+      }
 
       if (!session?.user) {
         setState({
@@ -253,241 +139,117 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hasAccess: false,
           isTrialActive: false,
           isAdmin: false,
-          canViewAnalytics: false,
-          canManageUsers: false,
         })
-        invalidateCache()
-        setLastUpdated(null)
         return
       }
 
-      // Upsert user login
-      await upsertUserLogin(session.user)
+      const { hasAccess, isTrialActive } = await checkUserAccess(session.user)
+      const isAdmin = isUserAdmin(session.user)
 
-      // Check admin status and user access
-      const [isAdmin, accessData] = await Promise.all([
-        checkAdminStatus(session.user),
-        checkUserAccess(session.user)
-      ])
-
-      const newState: ExtendedAuthState = {
+      setState({
         user: session.user,
         session,
         loading: false,
-        hasAccess: accessData.hasAccess,
-        isTrialActive: accessData.isTrialActive,
+        hasAccess,
+        isTrialActive,
         isAdmin,
-        canViewAnalytics: isAdmin,
-        canManageUsers: isAdmin,
-      }
-
-      setState(newState)
-      saveToCache(newState)
-      retryAttemptsRef.current = 0
-
+      })
     } catch (error) {
       console.error('Error refreshing user data:', error)
-      retryAttemptsRef.current++
-      
-      if (retryAttemptsRef.current >= MAX_RETRY_ATTEMPTS) {
-        setState(prev => ({ ...prev, loading: false }))
-        invalidateCache()
-      }
-      
-      setError(
-        error instanceof Error 
-          ? error
-          : new Error("Failed to refresh user data")
-      )
-    } finally {
-      setIsRefreshing(false)
+      setState(prev => ({ ...prev, loading: false }))
     }
-  }, [isRefreshing, supabase, checkAdminStatus, checkUserAccess, upsertUserLogin, saveToCache, invalidateCache])
-
-  const refreshUserData = async () => {
-    await refreshUserDataInternal()
-  }
-
-  // Sign in with Discord
-  const signInWithDiscord = async () => {
-    try {
-      setError(null)
-      const { error } = await withTimeout(
-        supabase.auth.signInWithOAuth({
-          provider: "discord",
-          options: {
-            redirectTo: `${window.location.origin}/auth/callback`,
-            scopes: 'identify',
-          },
-        })
-      )
-      if (error) throw error
-    } catch (error) {
-      console.error("Error signing in with Discord:", error)
-      setError(
-        error instanceof Error
-          ? error
-          : new Error("Failed to sign in with Discord")
-      )
-    }
-  }
-
-  // Sign out
-  const signOut = async () => {
-    try {
-      setError(null)
-      const { error } = await withTimeout(supabase.auth.signOut())
-      if (error) throw error
-
-      // Complete security cleanup
-      invalidateCache()
-
-      setState({
-        user: null,
-        session: null,
-        loading: false,
-        hasAccess: false,
-        isTrialActive: false,
-        isAdmin: false,
-        canViewAnalytics: false,
-        canManageUsers: false,
-      })
-
-      setLastUpdated(null)
-
-      // Clear intervals
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current)
-        refreshIntervalRef.current = null
-      }
-      if (healthCheckIntervalRef.current) {
-        clearInterval(healthCheckIntervalRef.current)
-        healthCheckIntervalRef.current = null
-      }
-
-      // Force page reload for complete cleanup
-      window.location.href = "/"
-    } catch (error) {
-      console.error("Error signing out:", error)
-      setError(
-        error instanceof Error
-          ? error
-          : new Error("Failed to sign out")
-      )
-    }
-  }
-
-  // Health check
-  const performHealthCheck = useCallback(async () => {
-    if (isRefreshing || !state.user) return
-
-    try {
-      const { data: { session }, error } = await withTimeout(
-        supabase.auth.getSession(),
-        5000
-      )
-
-      if (error || !session) {
-        console.warn('Health check failed - session invalid')
-        await signOut()
-      }
-    } catch (error) {
-      console.warn('Health check failed:', error)
-    }
-  }, [isRefreshing, state.user, supabase])
+  }, [supabase.auth, checkUserAccess])
 
   // Initialize auth state
   useEffect(() => {
     let mounted = true
 
+    // Get initial session
     const initializeAuth = async () => {
-      // Try to load from cache first
-      const cachedData = loadFromCache()
-      
-      if (!cachedData) {
-        setState(prev => ({ ...prev, loading: true }))
-        await refreshUserDataInternal()
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (!mounted) return
+        
+        if (error) {
+          console.error('Error getting initial session:', error)
+          setState(prev => ({ ...prev, loading: false }))
+          return
+        }
+
+        if (!session?.user) {
+          setState(prev => ({ ...prev, loading: false }))
+          return
+        }
+
+        const { hasAccess, isTrialActive } = await checkUserAccess(session.user)
+        const isAdmin = isUserAdmin(session.user)
+
+        if (mounted) {
+          setState({
+            user: session.user,
+            session,
+            loading: false,
+            hasAccess,
+            isTrialActive,
+            isAdmin,
+          })
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error)
+        if (mounted) {
+          setState(prev => ({ ...prev, loading: false }))
+        }
       }
+    }
 
-      // Set up auth state change listener
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          if (!mounted) return
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return
 
-          console.log('Auth state changed:', event)
+        if (event === 'SIGNED_OUT' || !session) {
+          setState({
+            user: null,
+            session: null,
+            loading: false,
+            hasAccess: false,
+            isTrialActive: false,
+            isAdmin: false,
+          })
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (session?.user) {
+            const { hasAccess, isTrialActive } = await checkUserAccess(session.user)
+            const isAdmin = isUserAdmin(session.user)
 
-          if (event === 'SIGNED_OUT' || !session) {
-            setState({
-              user: null,
-              session: null,
-              loading: false,
-              hasAccess: false,
-              isTrialActive: false,
-              isAdmin: false,
-              canViewAnalytics: false,
-              canManageUsers: false,
-            })
-            invalidateCache()
-            setLastUpdated(null)
-          } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            if (session?.user) {
-              // Delay to ensure session is fully established
-              setTimeout(() => {
-                if (mounted) {
-                  refreshUserDataInternal()
-                }
-              }, 1000)
+            if (mounted) {
+              setState({
+                user: session.user,
+                session,
+                loading: false,
+                hasAccess,
+                isTrialActive,
+                isAdmin,
+              })
             }
           }
         }
-      )
-
-      return () => {
-        subscription.unsubscribe()
       }
-    }
+    )
 
     initializeAuth()
 
     return () => {
       mounted = false
+      subscription.unsubscribe()
     }
-  }, []) // Empty dependency array intentional
-
-  // Set up refresh and health check intervals
-  useEffect(() => {
-    if (state.user && !isRefreshing) {
-      // Set up periodic refresh
-      refreshIntervalRef.current = setInterval(() => {
-        refreshUserDataInternal()
-      }, REFRESH_INTERVAL)
-
-      // Set up health check
-      healthCheckIntervalRef.current = setInterval(() => {
-        performHealthCheck()
-      }, HEALTH_CHECK_INTERVAL)
-    }
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current)
-        refreshIntervalRef.current = null
-      }
-      if (healthCheckIntervalRef.current) {
-        clearInterval(healthCheckIntervalRef.current)
-        healthCheckIntervalRef.current = null
-      }
-    }
-  }, [state.user, isRefreshing, refreshUserDataInternal, performHealthCheck])
+  }, [supabase.auth, checkUserAccess])
 
   const contextValue: AuthContextType = {
     ...state,
     signInWithDiscord,
     signOut,
     refreshUserData,
-    error,
-    isRefreshing,
-    lastUpdated,
   }
 
   return (

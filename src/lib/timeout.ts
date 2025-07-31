@@ -1,44 +1,37 @@
-// Utility for adding timeouts to promises
-export function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number = 10000
-): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
-    ),
-  ])
+export function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`Operation timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+  })
+
+  return Promise.race([promise, timeoutPromise])
 }
 
-// Retry utility with exponential backoff
-export async function withRetry<T>(
-  fn: () => Promise<T>,
+export function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+export async function retry<T>(
+  operation: () => Promise<T>,
   maxAttempts: number = 3,
-  baseDelay: number = 1000
+  delayMs: number = 1000
 ): Promise<T> {
   let lastError: Error
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await fn()
+      return await operation()
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error')
+      lastError = error instanceof Error ? error : new Error(String(error))
       
       if (attempt === maxAttempts) {
         throw lastError
       }
       
-      // Exponential backoff with jitter
-      const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000
-      await new Promise(resolve => setTimeout(resolve, delay))
+      await delay(delayMs * attempt) // Exponential backoff
     }
   }
-  
-  throw lastError!
-}
 
-// Sleep utility
-export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  throw lastError!
 }
