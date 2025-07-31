@@ -49,7 +49,7 @@ export function TestimonialsSection() {
         </h3>
         
         <p className="text-xl text-white/70 max-w-2xl mx-auto">
-          Trusted by thousands of ELAN Life players worldwide
+          Trusted by players worldwide
         </p>
       </div>
 
