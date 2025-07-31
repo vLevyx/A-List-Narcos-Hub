@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
+import { createServerClient } from '@supabase/ssr'
+
+// Force Node.js runtime to avoid Edge Runtime issues
+export const runtime = 'nodejs'
 
 // Enhanced security headers
 const securityHeaders = {
@@ -102,6 +105,76 @@ function logSecurityEvent(request: NextRequest, event: string, details?: string)
   console.log(`[SECURITY] ${timestamp} | ${event} | IP: ${ip} | Path: ${request.nextUrl.pathname} | Details: ${details || 'none'} | UA: ${userAgent.slice(0, 100)}`)
 }
 
+// Direct session update to avoid Edge Runtime issues
+async function updateSession(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return request.cookies.get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            request.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+            response = NextResponse.next({
+              request: {
+                headers: request.headers,
+              },
+            })
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+          },
+          remove(name: string, options: any) {
+            request.cookies.set({
+              name,
+              value: '',
+              ...options,
+            })
+            response = NextResponse.next({
+              request: {
+                headers: request.headers,
+              },
+            })
+            response.cookies.set({
+              name,
+              value: '',
+              ...options,
+            })
+          },
+        },
+      }
+    )
+    
+    // Refresh session if expired - required for Server Components
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (error) {
+      console.warn('Session refresh error:', error.message)
+      // Don't throw - just log and continue
+    }
+
+    return response
+  } catch (error: any) {
+    console.warn('Supabase middleware error:', error.message)
+    return response
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   
@@ -111,7 +184,7 @@ export async function middleware(request: NextRequest) {
       logSecurityEvent(request, 'ADMIN_ROUTE_ACCESS')
     }
 
-    // Core session update
+    // Core session update with error handling
     const response = await updateSession(request)
     
     // Apply security headers
