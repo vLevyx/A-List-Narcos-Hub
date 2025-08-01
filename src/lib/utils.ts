@@ -34,18 +34,25 @@ export function getUsername(user: User | null): string {
   )
 }
 
-// Get Discord avatar URL
+// FIXED: Get Discord avatar URL - corrected the URL construction
 export function getAvatarUrl(user: User | null): string {
   if (!user) return 'https://cdn.discordapp.com/embed/avatars/0.png'
   
   const discordId = getDiscordId(user)
-  const avatar = user.user_metadata?.avatar_url
+  const avatarHash = user.user_metadata?.avatar_url
   
-  if (avatar && discordId) {
-    return `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png?size=256`
+  // Check if avatarHash is already a full URL (shouldn't happen but safety check)
+  if (avatarHash && avatarHash.startsWith('https://')) {
+    return avatarHash
   }
   
-  return user.user_metadata?.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png'
+  // Construct proper Discord avatar URL
+  if (avatarHash && discordId) {
+    return `https://cdn.discordapp.com/avatars/${discordId}/${avatarHash}.png?size=256`
+  }
+  
+  // Fallback to default Discord avatar
+  return 'https://cdn.discordapp.com/embed/avatars/0.png'
 }
 
 // Format date utilities
@@ -95,33 +102,40 @@ export function isUserAdmin(user: User | null): boolean {
   const discordId = getDiscordId(user)
   const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
   
-  return discordId ? adminIds.includes(discordId.trim()) : false
+  return discordId ? adminIds.includes(discordId) : false
 }
 
-// Format number utility
+// Additional utility functions for your app
 export function formatNumber(num: number): string {
-  return new Intl.NumberFormat().format(num)
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M'
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
+  return num.toString()
 }
 
-// Simple storage utilities (fallback for localStorage)
-export function getFromStorage(key: string): any {
+// Storage utilities for caching
+export function getFromStorage<T>(key: string): T | null {
   if (typeof window === 'undefined') return null
   
   try {
     const item = localStorage.getItem(key)
     return item ? JSON.parse(item) : null
-  } catch {
+  } catch (error) {
+    console.error(`Error reading from localStorage key "${key}":`, error)
     return null
   }
 }
 
-export function setToStorage(key: string, value: any): void {
+export function setToStorage<T>(key: string, value: T): void {
   if (typeof window === 'undefined') return
   
   try {
     localStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    // Ignore storage errors
+  } catch (error) {
+    console.error(`Error writing to localStorage key "${key}":`, error)
   }
 }
 
@@ -130,7 +144,7 @@ export function removeFromStorage(key: string): void {
   
   try {
     localStorage.removeItem(key)
-  } catch {
-    // Ignore storage errors
+  } catch (error) {
+    console.error(`Error removing localStorage key "${key}":`, error)
   }
 }

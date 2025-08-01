@@ -1,49 +1,54 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import { Providers } from './providers'
+import { Outfit } from 'next/font/google'
+import { AuthProvider } from '@/hooks/useAuth'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
+import './globals.css'
 
-const inter = Inter({
+// Enhanced Outfit font configuration with more weights and better loading
+const outfit = Outfit({
   subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap'
+  weight: ['300', '400', '500', '600', '700', '800'],
+  display: 'swap',
+  variable: '--font-outfit',
+  preload: true,
+  fallback: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif']
 })
 
-// ✅ NEW: Separate viewport export (this fixes the warning)
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 5, // Allow zoom for accessibility
-  userScalable: true, // Better for accessibility compliance
-}
-
-// ✅ UPDATED: Clean metadata without viewport property
 export const metadata: Metadata = {
-  title: 'A-List Narcos Hub | Premium Tools & Services',
-  description: 'Premium tools and services for narcos operations - secure, reliable, and efficient.',
-  keywords: 'narcos, tools, premium, secure, reliable',
-  authors: [{ name: 'A-List Team' }],
-  robots: 'index, follow',
-  // ❌ REMOVED: viewport property (this was causing the warning)
-  
-  // 🚀 BONUS: Enhanced SEO metadata for better Lighthouse scores
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+  title: 'A-List Hub',
+  description: 'Everything you need for ELAN Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
+  keywords: 'ELAN Life, gaming tools, crafting calculator, price planner, weapon compatibility',
+  authors: [{ name: 'Levy' }],
+  creator: 'The A-List Team',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon-16x16.png',
+    apple: '/apple-touch-icon.png',
+  },
   openGraph: {
+    title: 'A-List Hub',
+    description: 'Premium gaming tools for ELAN Life players',
     type: 'website',
     locale: 'en_US',
-    url: '/',
-    title: 'A-List Narcos Hub | Premium Tools & Services',
-    description: 'Premium tools and services for narcos operations - secure, reliable, and efficient.',
-    siteName: 'A-List Narcos Hub',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'A-List Narcos Hub | Premium Tools & Services',
-    description: 'Premium tools and services for narcos operations - secure, reliable, and efficient.',
+    title: 'A-List Hub',
+    description: 'Premium gaming tools for ELAN Life players',
   },
+  robots: {
+    index: true,
+    follow: true,
+  },
+}
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: '#121212',
 }
 
 export default function RootLayout({
@@ -52,15 +57,24 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className={`${inter.className} bg-background-primary text-text-primary min-h-screen flex flex-col antialiased`}>
-        <Providers>
-          <Navbar />
-          <main className="flex-1">
-            {children}
-          </main>
-          <Footer />
-        </Providers>
+    <html lang="en" className={outfit.variable} suppressHydrationWarning>
+      <head>
+        {/* Only keep DNS prefetch for performance - remove the manual font link */}
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+      </head>
+      <body
+        className={`${outfit.className} min-h-screen bg-gradient-to-br from-background-primary via-background-secondary to-background-primary`}
+      >
+        <AuthProvider>
+          <div className="flex flex-col min-h-screen">
+            <Navbar />
+            <main className="flex-1">
+              {children}
+            </main>
+            <Footer />
+          </div>
+        </AuthProvider>
       </body>
     </html>
   )

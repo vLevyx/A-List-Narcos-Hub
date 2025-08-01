@@ -104,7 +104,7 @@ export function HeroSection() {
             </p>
             
             <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
-              Professional-grade tools and resources designed for serious players
+              Tools and resources designed for dedicated players
             </p>
           </motion.div>
 

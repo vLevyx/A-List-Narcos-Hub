@@ -1,34 +1,35 @@
-'use client'
+"use client";
 
-import { motion } from 'framer-motion'
-import { Star, Quote } from 'lucide-react'
+import { motion } from "framer-motion";
+import { Star, Quote } from "lucide-react";
 
 const testimonials = [
   {
     quote: "The Crafting Calculator saved me hours — can't play without it.",
     author: "Alexa Knox",
     role: "A-List Vice President",
-    rating: 5
+    rating: 5,
   },
   {
     quote: "Few match the knowledge and experience The A-List brings.",
     author: "Hamish Macbeth",
     role: "Community Leader",
-    rating: 5
+    rating: 5,
   },
   {
     quote: "Helps with EMS",
     author: "Stagger Lee",
     role: "LakeSide EMS",
-    rating: 5
+    rating: 5,
   },
   {
-    quote: "Super helpful and easy tools to use, definitely a must-try for everyone!",
+    quote:
+      "Super helpful and easy tools to use, definitely a must-try for everyone!",
     author: "Xena Ramirez",
     role: "New Player",
-    rating: 5
-  }
-]
+    rating: 5,
+  },
+];
 
 export function TestimonialsSection() {
   return (
@@ -41,13 +42,15 @@ export function TestimonialsSection() {
       <div className="text-center mb-12">
         <div className="inline-flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/20 rounded-full px-4 py-2 mb-6">
           <Star className="w-4 h-4 text-yellow-400" />
-          <span className="text-sm font-medium text-yellow-300">Player Reviews</span>
+          <span className="text-sm font-medium text-yellow-300">
+            Player Reviews
+          </span>
         </div>
-        
+
         <h3 className="text-4xl font-bold text-white mb-4">
           What <span className="gradient-text">Players Say</span>
         </h3>
-        
+
         <p className="text-xl text-white/70 max-w-2xl mx-auto">
           Trusted by players worldwide
         </p>
@@ -59,7 +62,10 @@ export function TestimonialsSection() {
           <div>
             <div className="flex items-center justify-center gap-1 mb-2">
               {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                <Star
+                  key={i}
+                  className="w-5 h-5 fill-yellow-400 text-yellow-400"
+                />
               ))}
             </div>
             <div className="text-2xl font-bold text-white">5.0/5</div>
@@ -86,28 +92,36 @@ export function TestimonialsSection() {
             <div className="absolute -top-3 -left-3 w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
               <Quote className="w-4 h-4 text-white" />
             </div>
-            
+
             {/* Rating */}
             <div className="flex items-center gap-1 mb-4">
               {[...Array(testimonial.rating)].map((_, i) => (
-                <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                <Star
+                  key={i}
+                  className="w-4 h-4 fill-yellow-400 text-yellow-400"
+                />
               ))}
             </div>
-            
+
             {/* Quote */}
             <blockquote className="text-white/90 text-lg italic leading-relaxed mb-6">
               "{testimonial.quote}"
             </blockquote>
-            
+
             {/* Author */}
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center">
                 <span className="text-purple-400 font-bold text-lg">
-                  {testimonial.author.split(' ').map(n => n[0]).join('')}
+                  {testimonial.author
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
                 </span>
               </div>
               <div>
-                <div className="font-semibold text-purple-300">{testimonial.author}</div>
+                <div className="font-semibold text-purple-300">
+                  {testimonial.author}
+                </div>
                 <div className="text-sm text-white/60">{testimonial.role}</div>
               </div>
             </div>
@@ -115,14 +129,13 @@ export function TestimonialsSection() {
         ))}
       </div>
 
-      {/* CTA */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 1.2 }}
         className="text-center mt-12"
       >
-        <div className="bg-white/5 backdrop-blur-sm border border-purple-500/20 rounded-xl p-8 max-w-2xl mx-auto">
+        <div className="community-card rounded-xl p-8 max-w-2xl mx-auto">
           <h4 className="text-2xl font-bold text-white mb-4">
             Join the Community
           </h4>
@@ -148,5 +161,5 @@ export function TestimonialsSection() {
         </div>
       </motion.div>
     </motion.section>
-  )
+  );
 }
