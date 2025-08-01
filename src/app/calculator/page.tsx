@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ChevronDown, Package, Clock, Zap, AlertCircle, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePageTracking } from '@/hooks/usePageTracking';
+import { CustomDropdown } from '@/components/ui/CustomDropdown';
 
 const PURPLE_PRIMARY = '#8b5cf6';
 
@@ -105,6 +106,26 @@ export default function NarcosCalculatorPage() {
   const [quantity, setQuantity] = useState(1);
   const [results, setResults] = useState<CalculationResults | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+
+  // Transform category data for CustomDropdown
+  const categoryOptions = [
+    { value: "", label: "Select Category" },
+    ...Object.keys(itemsByCategory).map(category => ({
+      value: category,
+      label: category
+    }))
+  ];
+
+  // Transform item data for CustomDropdown
+  const itemOptions = [
+    { value: "", label: "Select Item" },
+    ...(selectedCategory && itemsByCategory[selectedCategory as keyof typeof itemsByCategory] 
+      ? itemsByCategory[selectedCategory as keyof typeof itemsByCategory].map(item => ({
+          value: item,
+          label: `${item}${craftingLevels[item] > 0 ? ` (Level ${craftingLevels[item]})` : ''}`
+        }))
+      : [])
+  ];
 
   const collectBaseResources = (itemName: string, quantity: number): { [key: string]: number } => {
     const resources: { [key: string]: number } = {};
@@ -251,47 +272,31 @@ export default function NarcosCalculatorPage() {
 
             <div className="space-y-4 sm:space-y-6">
 
+              {/* Category Dropdown */}
               <div>
                 <label className="block text-white/90 font-medium mb-3">Category</label>
-                <div className="relative">
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => {
-                      setSelectedCategory(e.target.value);
-                      setSelectedItem("");
-                      setResults(null);
-                    }}
-                    className="w-full dark-dropdown"
-                  >
-                    <option value="">Select Category</option>
-                    {Object.keys(itemsByCategory).map((category) => (
-                      <option key={category} value={category}>
-                        {category}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  value={selectedCategory}
+                  onChange={(value) => {
+                    setSelectedCategory(value);
+                    setSelectedItem("");
+                    setResults(null);
+                  }}
+                  options={categoryOptions}
+                  placeholder="Select Category"
+                />
               </div>
 
+              {/* Item Dropdown */}
               <div>
                 <label className="block text-white/90 font-medium mb-3">Item</label>
-                <div className="relative">
-                  <select
-                    value={selectedItem}
-                    onChange={(e) => {
-                      setSelectedItem(e.target.value);
-                    }}
-                    disabled={!selectedCategory}
-                    className="w-full dark-dropdown disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="">Select Item</option>
-                    {selectedCategory && itemsByCategory[selectedCategory as keyof typeof itemsByCategory]?.map((item) => (
-                      <option key={item} value={item}>
-                        {item} {craftingLevels[item] > 0 && `(Level ${craftingLevels[item]})`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  value={selectedItem}
+                  onChange={(value) => setSelectedItem(value)}
+                  options={itemOptions}
+                  placeholder="Select Item"
+                  className={!selectedCategory ? 'opacity-50 pointer-events-none' : ''}
+                />
               </div>
 
               <div>
@@ -354,7 +359,7 @@ export default function NarcosCalculatorPage() {
                     </div>
                   </div>
 
-                  {/* Resources Needed Section - Exact layout match */}
+                  {/* Resources Needed Section */}
                   <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
                     Resources Needed
                   </h2>
@@ -371,7 +376,7 @@ export default function NarcosCalculatorPage() {
                     </ul>
                   )}
 
-                  {/* Crafting Time Section - Exact layout match */}
+                  {/* Crafting Time Section */}
                   <div className="mt-6">
                     <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
                       Estimated Crafting Time

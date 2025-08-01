@@ -74,7 +74,7 @@ export default function AuthCodeError({ searchParams }: AuthCodeErrorProps) {
             <p className="text-xs text-text-secondary">
               Still having trouble? Check your internet connection or try again later.
               <br />
-              If the problem persists, contact support.
+              If the problem persists, contact us in our Discord.
             </p>
           </div>
         </div>
