@@ -236,7 +236,7 @@ export function Navbar() {
               </div>
             ) : (
               <Button onClick={signInWithDiscord} size="sm" className="gradient-primary text-white">
-                Sign In
+                Login with Discord
               </Button>
             )}
           </div>

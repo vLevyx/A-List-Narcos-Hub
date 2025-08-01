@@ -50,7 +50,7 @@ export function Footer() {
               </div>
             </Link>
             <p className="text-text-secondary text-sm mb-4 max-w-xs">
-              Premium tools and secure infrastructure for professional operations. 
+              Premium tools for Narcos Life.
               Built for those who demand excellence.
             </p>
             <div className="flex items-center space-x-2">

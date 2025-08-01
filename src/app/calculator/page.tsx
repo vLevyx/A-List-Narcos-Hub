@@ -310,9 +310,9 @@ export default function NarcosCalculatorPage() {
                     const newQuantity = parseInt(e.target.value) || 1;
                     setQuantity(newQuantity);
                   }}
-                  className="w-full bg-background-tertiary border border-white/10 rounded-xl px-4 py-3 text-white 
+                  className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white 
                            focus:outline-none focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20 
-                           transition-all"
+                           transition-all placeholder:text-gray-400"
                   placeholder="1"
                 />
               </div>
