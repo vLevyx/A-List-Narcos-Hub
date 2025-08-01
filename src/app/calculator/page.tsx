@@ -275,28 +275,31 @@ export default function NarcosCalculatorPage() {
               {/* Category Dropdown */}
               <div>
                 <label className="block text-white/90 font-medium mb-3">Category</label>
-                <CustomDropdown
-                  value={selectedCategory}
-                  onChange={(value) => {
-                    setSelectedCategory(value);
-                    setSelectedItem("");
-                    setResults(null);
-                  }}
-                  options={categoryOptions}
-                  placeholder="Select Category"
-                />
+                <div className="w-full border border-white/20 rounded-xl bg-[#2a2a2a]">
+                  <CustomDropdown
+                    value={selectedCategory}
+                    onChange={(value) => {
+                      setSelectedCategory(value);
+                      setSelectedItem("");
+                      setResults(null);
+                    }}
+                    options={categoryOptions}
+                    placeholder="Select Category"
+                  />
+                </div>
               </div>
 
               {/* Item Dropdown */}
               <div>
                 <label className="block text-white/90 font-medium mb-3">Item</label>
-                <CustomDropdown
-                  value={selectedItem}
-                  onChange={(value) => setSelectedItem(value)}
-                  options={itemOptions}
-                  placeholder="Select Item"
-                  className={!selectedCategory ? 'opacity-50 pointer-events-none' : ''}
-                />
+                <div className={`w-full border border-white/20 rounded-xl bg-[#2a2a2a] ${!selectedCategory ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <CustomDropdown
+                    value={selectedItem}
+                    onChange={(value) => setSelectedItem(value)}
+                    options={itemOptions}
+                    placeholder="Select Item"
+                  />
+                </div>
               </div>
 
               <div>
@@ -310,7 +313,7 @@ export default function NarcosCalculatorPage() {
                     const newQuantity = parseInt(e.target.value) || 1;
                     setQuantity(newQuantity);
                   }}
-                  className="w-full bg-[#1a1a1a] border border-white/10 rounded-xl px-4 py-3 text-white 
+                  className="w-full bg-[#2a2a2a] border border-white/20 rounded-xl px-4 py-3 text-white 
                            focus:outline-none focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20 
                            transition-all placeholder:text-gray-400"
                   placeholder="1"
