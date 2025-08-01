@@ -59,6 +59,32 @@ interface AuthContextType extends ExtendedAuthState {
   getSessionHealth: () => { isHealthy: boolean; lastCheck: number | null };
 }
 
+// FIXED: Add proper interface for cached data
+interface CachedAuthData {
+  state: {
+    userExists: boolean;
+    sessionExists: boolean;
+    hasAccess: boolean;
+    isTrialActive: boolean;
+    isAdmin: boolean;
+    canViewAnalytics: boolean;
+    canManageUsers: boolean;
+  };
+  timestamp: number;
+}
+
+// FIXED: Type guard function for cached data
+function isCachedAuthData(data: unknown): data is CachedAuthData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'timestamp' in data &&
+    'state' in data &&
+    typeof (data as any).timestamp === 'number' &&
+    typeof (data as any).state === 'object'
+  );
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
@@ -284,12 +310,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // SECURITY ENHANCEMENT: Secure cache loading with validation
+  // FIXED: Secure cache loading with proper TypeScript types
   useEffect(() => {
     try {
       const cached = getFromStorage(AUTH_CACHE_KEY);
 
-      if (cached && cached.timestamp) {
+      // FIXED: Use type guard for safe property access
+      if (cached && isCachedAuthData(cached)) {
         const isExpired = Date.now() - cached.timestamp > AUTH_CACHE_TTL;
         
         // SECURITY: Validate cached data structure
@@ -298,8 +325,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           // Reconstruct minimal state from cache
           const cachedState = {
-            user: cached.state.userExists ? { id: 'cached' } : null, // Minimal user object
-            session: cached.state.sessionExists ? { expires_at: 0 } : null, // Minimal session
+            user: cached.state.userExists ? { id: 'cached' } as User : null,
+            session: cached.state.sessionExists ? { expires_at: 0 } as Session : null,
             loading: false,
             hasAccess: cached.state.hasAccess,
             isTrialActive: cached.state.isTrialActive || false,
