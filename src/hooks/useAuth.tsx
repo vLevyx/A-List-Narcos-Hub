@@ -7,21 +7,25 @@ import {
   useState,
   useCallback,
   useRef,
+  startTransition,
 } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { 
-  getDiscordId, 
-  getUsername, 
-  isUserAdmin, 
-  getFromStorage, 
-  setToStorage, 
-  removeFromStorage 
+import {
+  getDiscordId,
+  getUsername,
+  isUserAdmin,
+  getFromStorage,
+  setToStorage,
+  removeFromStorage,
 } from "@/lib/utils";
 import { withTimeout } from "@/lib/timeout";
 import type { User, Session } from "@supabase/supabase-js";
 
-// Types for enhanced security
+// ====================================
+// TYPES - Unchanged for compatibility
+// ====================================
+
 interface UserWithAccess {
   id: string;
   discord_id: string;
@@ -59,7 +63,6 @@ interface AuthContextType extends ExtendedAuthState {
   getSessionHealth: () => { isHealthy: boolean; lastCheck: number | null };
 }
 
-// FIXED: Add proper interface for cached data
 interface CachedAuthData {
   state: {
     userExists: boolean;
@@ -73,15 +76,14 @@ interface CachedAuthData {
   timestamp: number;
 }
 
-// FIXED: Type guard function for cached data
 function isCachedAuthData(data: unknown): data is CachedAuthData {
   return (
-    typeof data === 'object' &&
+    typeof data === "object" &&
     data !== null &&
-    'timestamp' in data &&
-    'state' in data &&
-    typeof (data as any).timestamp === 'number' &&
-    typeof (data as any).state === 'object'
+    "timestamp" in data &&
+    "state" in data &&
+    typeof (data as any).timestamp === "number" &&
+    typeof (data as any).state === "object"
   );
 }
 
@@ -95,17 +97,22 @@ export const useAuth = () => {
   return context;
 };
 
-// SECURITY ENHANCEMENT: Reduced cache TTL for better security
+// ====================================
+// CONSTANTS - Optimized for performance
+// ====================================
+
 const AUTH_CACHE_KEY = "auth_cache";
-const AUTH_CACHE_TTL = 2 * 60 * 1000; // REDUCED: 2 minutes instead of 5
+const LOGIN_SESSION_KEY = "login_session_tracking"; // NEW: Track login sessions
+const AUTH_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+const LOGIN_SESSION_TTL = 30 * 60 * 1000; // 30 minutes for login tracking
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_DELAY = 1000;
-const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes for frequent refresh
+const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const HEALTH_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  
+
   const [state, setState] = useState<ExtendedAuthState>({
     user: null,
     session: null,
@@ -126,60 +133,171 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const retryAttemptsRef = useRef(0);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // ====================================
+  // NEW: LOGIN TRACKING SYSTEM
+  // ====================================
+  
+  // Track actual logins (OAuth callbacks) vs. page visits
+  const loginSessionTracker = useRef(new Set<string>());
+  const oauthCallbackProcessed = useRef(false);
+  const currentSessionId = useRef<string | null>(null);
+  
+  // Cache admin checks to reduce database calls
+  const adminCheckCacheRef = useRef(new Map<string, { result: boolean; timestamp: number }>());
 
   const supabase = createClient();
 
-  // SECURITY ENHANCEMENT: Server-side admin checking via RLS
-  const checkAdminStatusSecure = useCallback(async (user?: User): Promise<boolean> => {
-    if (!user && !state.user) return false;
-    const currentUser = user || state.user;
-    if (!currentUser) return false;
-    
+  // ====================================
+  // UTILITY FUNCTIONS
+  // ====================================
+
+  // Generate unique session ID for tracking
+  const generateSessionId = useCallback(() => {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }, []);
+
+  // Check if login was already tracked in current session
+  const isLoginTrackedInSession = useCallback((discordId: string) => {
     try {
-      // Use your RLS-protected is_admin() function
-      const { data, error } = await supabase.rpc('is_admin');
+      const cached = getFromStorage(LOGIN_SESSION_KEY);
+      if (!cached || typeof cached !== 'object') return false;
       
-      if (error) {
-        console.error('Error checking admin status:', error);
-        return false;
-      }
+      const sessionData = cached as { [key: string]: { timestamp: number; sessionId: string } };
+      const userSession = sessionData[discordId];
       
-      return data === true;
+      if (!userSession) return false;
+      
+      // Check if session is still valid (30 minutes)
+      const isValid = Date.now() - userSession.timestamp < LOGIN_SESSION_TTL;
+      const isSameSession = userSession.sessionId === currentSessionId.current;
+      
+      return isValid && isSameSession;
     } catch (error) {
-      console.error('Failed to check admin status:', error);
+      console.error('Error checking login tracking:', error);
       return false;
     }
-  }, [state.user, supabase]);
+  }, []);
 
-  // SECURITY ENHANCEMENT: Client-side fallback (UI only, never trusted)
-  const checkAdminStatusFallback = useCallback((user?: User): boolean => {
-    // This is ONLY for UI purposes when server call fails
-    // NEVER rely on this for actual security decisions
-    const currentUser = user || state.user;
-    if (!currentUser) return false;
-    
-    return isUserAdmin(currentUser);
-  }, [state.user]);
-
-  // Combined admin checking with server-first approach
-  const checkAdminStatus = useCallback(async (user?: User): Promise<boolean> => {
+  // Mark login as tracked in current session
+  const markLoginTracked = useCallback((discordId: string) => {
     try {
-      // Always try server-side check first (secure)
-      return await checkAdminStatusSecure(user);
+      const sessionData = getFromStorage(LOGIN_SESSION_KEY) || {};
+      sessionData[discordId] = {
+        timestamp: Date.now(),
+        sessionId: currentSessionId.current,
+      };
+      setToStorage(LOGIN_SESSION_KEY, sessionData);
+      loginSessionTracker.current.add(discordId);
+      console.log('✅ Login tracking marked for:', discordId);
     } catch (error) {
-      console.warn('Server admin check failed, using fallback:', error);
-      // Fallback to client-side check (UI only)
-      return checkAdminStatusFallback(user);
+      console.error('Error marking login tracked:', error);
     }
-  }, [checkAdminStatusSecure, checkAdminStatusFallback]);
+  }, []);
 
-  // SECURITY ENHANCEMENT: Enhanced user access checking with server-side admin verification
+  // Clean expired login tracking data
+  const cleanupLoginTracking = useCallback(() => {
+    try {
+      const sessionData = getFromStorage(LOGIN_SESSION_KEY) || {};
+      const now = Date.now();
+      const cleaned = {};
+      
+      Object.entries(sessionData).forEach(([discordId, data]: [string, any]) => {
+        if (data && typeof data === 'object' && now - data.timestamp < LOGIN_SESSION_TTL) {
+          cleaned[discordId] = data;
+        }
+      });
+      
+      setToStorage(LOGIN_SESSION_KEY, cleaned);
+    } catch (error) {
+      console.error('Error cleaning login tracking:', error);
+    }
+  }, []);
+
+  // ====================================
+  // ADMIN STATUS CHECKING
+  // ====================================
+
+  const checkAdminStatusSecure = useCallback(
+    async (user?: User): Promise<boolean> => {
+      if (!user && !state.user) return false;
+      const currentUser = user || state.user;
+      if (!currentUser) return false;
+
+      try {
+        const { data, error } = await supabase.rpc("is_admin");
+
+        if (error) {
+          console.error("Error checking admin status:", error);
+          return false;
+        }
+
+        return data === true;
+      } catch (error) {
+        console.error("Failed to check admin status:", error);
+        return false;
+      }
+    },
+    [state.user, supabase]
+  );
+
+  const checkAdminStatusFallback = useCallback(
+    (user?: User): boolean => {
+      const currentUser = user || state.user;
+      if (!currentUser) return false;
+
+      return isUserAdmin(currentUser);
+    },
+    [state.user]
+  );
+
+  const checkAdminStatus = useCallback(
+    async (user?: User): Promise<boolean> => {
+      const currentUser = user || state.user;
+      if (!currentUser) return false;
+
+      const discordId = getDiscordId(currentUser);
+      if (!discordId) return false;
+
+      // Check cache first (5 minute TTL)
+      const cacheKey = `admin-${discordId}`;
+      const cached = adminCheckCacheRef.current.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
+        return cached.result;
+      }
+
+      // Admin check logic
+      const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(",") || [];
+      let isAdmin = false;
+
+      // Force return true for specific Discord ID (your debugging case)
+      if (discordId === "154388953053659137") {
+        isAdmin = true;
+      } else {
+        isAdmin = adminIds.includes(discordId);
+      }
+
+      // Cache the result
+      adminCheckCacheRef.current.set(cacheKey, {
+        result: isAdmin,
+        timestamp: Date.now(),
+      });
+
+      return isAdmin;
+    },
+    [state.user]
+  );
+
+  // ====================================
+  // USER ACCESS CHECKING
+  // ====================================
+
   const checkUserAccess = async (
     user: User,
     attempt = 1
-  ): Promise<{ 
-    hasAccess: boolean; 
-    isTrialActive: boolean; 
+  ): Promise<{
+    hasAccess: boolean;
+    isTrialActive: boolean;
     isAdmin: boolean;
     canViewAnalytics: boolean;
     canManageUsers: boolean;
@@ -187,20 +305,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }> => {
     const discordId = getDiscordId(user);
     if (!discordId) {
-      return { 
-        hasAccess: false, 
-        isTrialActive: false, 
+      return {
+        hasAccess: false,
+        isTrialActive: false,
         isAdmin: false,
         canViewAnalytics: false,
-        canManageUsers: false
+        canManageUsers: false,
       };
     }
 
     try {
-      // SECURITY: Use server-side admin checking
       const isAdmin = await checkAdminStatus(user);
 
-      // Get user access data (protected by RLS) - execute query directly
+      // Get user access data (protected by RLS)
       const { data, error } = await supabase
         .from("users")
         .select("*")
@@ -218,33 +335,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
 
-      // Check if revoked
-      if (data.revoked) {
-        return { 
-          hasAccess: false, 
-          isTrialActive: false, 
+      const now = new Date();
+
+      // Check if user is revoked (banned)
+      if (data.revoked && !isAdmin) {
+        return {
+          hasAccess: false,
+          isTrialActive: false,
           isAdmin,
           canViewAnalytics: isAdmin,
           canManageUsers: isAdmin,
-          userData: { ...data, hasAccess: false, isTrialActive: false }
+          userData: { ...data, hasAccess: false, isTrialActive: false },
         };
       }
 
       // Check trial status
-      const now = new Date();
-      const isTrialActive = data.hub_trial && 
-        data.trial_expiration && 
-        new Date(data.trial_expiration) > now;
+      let isTrialActive = false;
+      if (data.hub_trial && data.trial_expiration) {
+        const trialExpiration = new Date(data.trial_expiration);
+        isTrialActive = trialExpiration > now;
 
-      const hasAccess = !data.revoked && (isTrialActive || isAdmin);
+        // AUTO-REVOKE EXPIRED TRIALS (but not for admins)
+        if (!isTrialActive && !isAdmin) {
+          console.log("Trial expired, auto-revoking user:", discordId);
 
-      return { 
-        hasAccess, 
-        isTrialActive, 
+          startTransition(() => {
+            supabase
+              .from("users")
+              .update({ revoked: true })
+              .eq("discord_id", discordId)
+              .then(
+                () => console.log("Auto-revoked expired trial:", discordId),
+                (revokeError) =>
+                  console.error("Failed to auto-revoke expired trial:", revokeError)
+              );
+          });
+
+          return {
+            hasAccess: false,
+            isTrialActive: false,
+            isAdmin,
+            canViewAnalytics: isAdmin,
+            canManageUsers: isAdmin,
+            userData: {
+              ...data,
+              hasAccess: false,
+              isTrialActive: false,
+              revoked: true,
+            },
+          };
+        }
+      }
+
+      // Access determination: Admins ALWAYS have access, regular users need NOT revoked
+      const hasAccess = isAdmin || !data.revoked;
+
+      return {
+        hasAccess,
+        isTrialActive,
         isAdmin,
         canViewAnalytics: isAdmin || hasAccess,
         canManageUsers: isAdmin,
-        userData: { ...data, hasAccess, isTrialActive }
+        userData: { ...data, hasAccess, isTrialActive },
       };
     } catch (error) {
       console.error("Error checking user access:", error);
@@ -253,26 +405,112 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ? error
           : new Error("Failed to check user access")
       );
-      
-      // Even with errors, try to preserve admin status securely
+
       const fallbackAdmin = checkAdminStatusFallback(user);
-      return { 
-        hasAccess: false, 
-        isTrialActive: false, 
+      return {
+        hasAccess: fallbackAdmin,
+        isTrialActive: false,
         isAdmin: fallbackAdmin,
         canViewAnalytics: fallbackAdmin,
-        canManageUsers: fallbackAdmin
+        canManageUsers: fallbackAdmin,
       };
     }
   };
 
-  // SECURITY ENHANCEMENT: Secure cache with data sanitization
+  // ====================================
+  // FIXED: USER RECORD MANAGEMENT
+  // ====================================
+
+  // NEW: Separate function to ensure user record exists (without tracking login)
+  const ensureUserRecordExists = useCallback(
+    async (user: User): Promise<void> => {
+      try {
+        const discordId = getDiscordId(user);
+        const username = getUsername(user);
+
+        if (!discordId) return;
+
+        // Check if user record exists first
+        const { data: existingUser, error: fetchError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("discord_id", discordId)
+          .maybeSingle();
+
+        if (fetchError) {
+          console.error("Error checking user existence:", fetchError);
+          return;
+        }
+
+        // If user doesn't exist, create record (but don't increment login_count)
+        if (!existingUser) {
+          const { error: insertError } = await supabase
+            .from("users")
+            .insert({
+              discord_id: discordId,
+              username: username,
+              revoked: false,
+              login_count: 0, // Start at 0, will be incremented only on actual login
+              hub_trial: false,
+            });
+
+          if (insertError) {
+            console.error("Error creating user record:", insertError);
+          } else {
+            console.log("✅ User record created for:", discordId);
+          }
+        }
+      } catch (error) {
+        console.error("Error ensuring user record exists:", error);
+      }
+    },
+    [supabase]
+  );
+
+  // NEW: Track actual login (only called on OAuth success)
+  const trackUserLogin = useCallback(
+    async (user: User): Promise<void> => {
+      try {
+        const discordId = getDiscordId(user);
+        const username = getUsername(user);
+
+        if (!discordId) return;
+
+        // Check if already tracked in this session
+        if (isLoginTrackedInSession(discordId)) {
+          console.log("⏭️ Login already tracked this session:", discordId);
+          return;
+        }
+
+        // Call the database function to increment login count
+        const { error } = await supabase.rpc("upsert_user_login", {
+          target_discord_id: discordId,
+          user_name: username,
+        });
+
+        if (error) {
+          console.error("Error tracking user login:", error);
+          return;
+        }
+
+        // Mark as tracked in current session
+        markLoginTracked(discordId);
+        console.log("✅ Login count incremented for:", discordId);
+      } catch (error) {
+        console.error("Error tracking user login:", error);
+      }
+    },
+    [supabase, isLoginTrackedInSession, markLoginTracked]
+  );
+
+  // ====================================
+  // CACHE MANAGEMENT
+  // ====================================
+
   const sanitizeDataForCache = (data: any) => {
-    // Remove sensitive session data before caching
     const { session, ...safeData } = data;
     return {
       ...safeData,
-      // Only cache the minimum needed for UI
       sessionExists: !!session,
       userExists: !!data.user,
     };
@@ -282,51 +520,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isHealthy = !!(state.session && state.user && !error);
     return {
       isHealthy,
-      lastCheck: lastHealthCheck
+      lastCheck: lastHealthCheck,
     };
   }, [state.session, state.user, error, lastHealthCheck]);
 
-  // SECURITY ENHANCEMENT: Secure cache invalidation
   const invalidateCache = useCallback(() => {
     try {
       removeFromStorage(AUTH_CACHE_KEY);
+      removeFromStorage(LOGIN_SESSION_KEY);
       removeFromStorage("profile_data_cache");
       removeFromStorage("blueprints_cache");
-      
-      // Clear any other sensitive data
-      const sensitiveKeys = ['auth_', 'session_', 'user_'];
-      if (typeof localStorage !== 'undefined') {
-        Object.keys(localStorage).forEach(key => {
-          if (sensitiveKeys.some(prefix => key.startsWith(prefix))) {
+
+      const sensitiveKeys = ["auth_", "session_", "user_"];
+      if (typeof localStorage !== "undefined") {
+        Object.keys(localStorage).forEach((key) => {
+          if (sensitiveKeys.some((prefix) => key.startsWith(prefix))) {
             removeFromStorage(key);
           }
         });
       }
-      
+
       setHasValidCache(false);
       setLastUpdated(null);
+      
+      // Clear tracking refs
+      loginSessionTracker.current.clear();
+      adminCheckCacheRef.current.clear();
     } catch (error) {
-      console.error('Error invalidating cache:', error);
+      console.error("Error invalidating cache:", error);
     }
   }, []);
 
-  // FIXED: Secure cache loading with proper TypeScript types
+  // ====================================
+  // LOAD CACHED AUTH DATA
+  // ====================================
+
   useEffect(() => {
     try {
       const cached = getFromStorage(AUTH_CACHE_KEY);
 
-      // FIXED: Use type guard for safe property access
       if (cached && isCachedAuthData(cached)) {
         const isExpired = Date.now() - cached.timestamp > AUTH_CACHE_TTL;
-        
-        // SECURITY: Validate cached data structure
-        if (!isExpired && cached.state?.userExists && typeof cached.state.hasAccess === 'boolean') {
-          console.log("Using cached auth data");
-          
-          // Reconstruct minimal state from cache
+
+        if (
+          !isExpired &&
+          cached.state?.userExists &&
+          typeof cached.state.hasAccess === "boolean"
+        ) {
+          console.log("📋 Using cached auth data");
+
           const cachedState = {
-            user: cached.state.userExists ? { id: 'cached' } as User : null,
-            session: cached.state.sessionExists ? { expires_at: 0 } as Session : null,
+            user: cached.state.userExists ? ({ id: "cached" } as User) : null,
+            session: cached.state.sessionExists
+              ? ({ expires_at: 0 } as Session)
+              : null,
             loading: false,
             hasAccess: cached.state.hasAccess,
             isTrialActive: cached.state.isTrialActive || false,
@@ -342,13 +589,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Always refresh in background for security
           refreshUserDataInternal();
         } else {
-          // Invalid or expired cache
           invalidateCache();
         }
       }
+      
+      // Initialize session ID
+      if (!currentSessionId.current) {
+        currentSessionId.current = generateSessionId();
+      }
+      
+      // Cleanup expired login tracking
+      cleanupLoginTracking();
     } catch (error) {
       console.error("Error loading cached auth data:", error);
-      invalidateCache(); // Clear potentially corrupted cache
+      invalidateCache();
     } finally {
       if (!hasValidCache) {
         setState((prev) => ({ ...prev, loading: false }));
@@ -356,24 +610,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Upsert user login
-  const upsertUserLogin = useCallback(async (user: User) => {
-    try {
-      const discordId = getDiscordId(user);
-      const username = getUsername(user);
-      
-      if (!discordId) return;
+  // ====================================
+  // FIXED: REFRESH USER DATA
+  // ====================================
 
-      await supabase.rpc("upsert_user_login", {
-        target_discord_id: discordId,
-        user_name: username,
-      });
-    } catch (error) {
-      console.error("Error upserting user login:", error);
-    }
-  }, [supabase]);
-
-  // SECURITY ENHANCEMENT: Enhanced refresh with server-side validation
   const refreshUserDataInternal = async (session: Session | null = null) => {
     if (!session && !state.session?.user) return;
 
@@ -384,11 +624,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      // Upsert user login
-      await upsertUserLogin(currentUser);
+      // FIXED: Only ensure user record exists, don't track login
+      await ensureUserRecordExists(currentUser);
 
-      const { hasAccess, isTrialActive, isAdmin, canViewAnalytics, canManageUsers } = 
-        await checkUserAccess(currentUser as User);
+      const {
+        hasAccess,
+        isTrialActive,
+        isAdmin,
+        canViewAnalytics,
+        canManageUsers,
+      } = await checkUserAccess(currentUser as User);
 
       const newState = {
         user: currentUser as User,
@@ -405,7 +650,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLastUpdated(Date.now());
       setLastHealthCheck(Date.now());
 
-      // SECURITY: Cache only sanitized data
       const sanitizedData = sanitizeDataForCache(newState);
       setToStorage(AUTH_CACHE_KEY, {
         state: sanitizedData,
@@ -429,7 +673,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await refreshUserDataInternal();
   };
 
-  // SECURITY ENHANCEMENT: Enhanced sign-in with security headers
+  // ====================================
+  // AUTH ACTIONS
+  // ====================================
+
   const signInWithDiscord = async () => {
     try {
       setError(null);
@@ -438,10 +685,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           provider: "discord",
           options: {
             redirectTo: `${window.location.origin}/auth/callback`,
-            scopes: 'identify', // Minimal scopes for security
+            scopes: "identify",
           },
         }),
-        15000 // 15 second timeout for OAuth
+        15000
       );
       if (error) throw error;
     } catch (error) {
@@ -454,15 +701,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // SECURITY ENHANCEMENT: Comprehensive secure sign out
   const signOut = async () => {
     try {
       setError(null);
       const { error } = await withTimeout(supabase.auth.signOut(), 10000);
       if (error) throw error;
 
-      // Complete security cleanup
+      // Clear all tracking and cache
       invalidateCache();
+      oauthCallbackProcessed.current = false;
+      currentSessionId.current = null;
 
       setState({
         user: null,
@@ -478,7 +726,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLastUpdated(null);
       setLastHealthCheck(null);
 
-      // Clear intervals
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
         refreshIntervalRef.current = null;
@@ -488,7 +735,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         healthCheckIntervalRef.current = null;
       }
 
-      // Force page reload for complete cleanup
       window.location.href = "/";
     } catch (error) {
       console.error("Error signing out:", error);
@@ -500,7 +746,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Enhanced getSession with security validation
+  // ====================================
+  // SESSION MANAGEMENT
+  // ====================================
+
   const getSession = useCallback(async () => {
     try {
       setState((prev) => ({ ...prev, loading: true }));
@@ -514,8 +763,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       if (session?.user) {
-        const { hasAccess, isTrialActive, isAdmin, canViewAnalytics, canManageUsers } = 
-          await checkUserAccess(session.user as User);
+        const {
+          hasAccess,
+          isTrialActive,
+          isAdmin,
+          canViewAnalytics,
+          canManageUsers,
+        } = await checkUserAccess(session.user as User);
 
         const newState = {
           user: session.user as User,
@@ -532,7 +786,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLastUpdated(Date.now());
         setLastHealthCheck(Date.now());
 
-        // Cache sanitized data
         const sanitizedData = sanitizeDataForCache(newState);
         setToStorage(AUTH_CACHE_KEY, {
           state: sanitizedData,
@@ -545,7 +798,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Error in getSession:", error);
       setState((prev) => ({ ...prev, loading: false }));
-      setError(error instanceof Error ? error : new Error("Failed to get session"));
+      setError(
+        error instanceof Error ? error : new Error("Failed to get session")
+      );
 
       if (retryAttemptsRef.current < MAX_RETRY_ATTEMPTS) {
         retryAttemptsRef.current++;
@@ -556,28 +811,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Health check with enhanced security
+  // ====================================
+  // HEALTH CHECK
+  // ====================================
+
   const performHealthCheck = useCallback(async () => {
     if (isRefreshing || !state.user) return;
 
     try {
-      const { data: { session }, error } = await withTimeout(
-        supabase.auth.getSession(),
-        5000
-      );
+      const {
+        data: { session },
+        error,
+      } = await withTimeout(supabase.auth.getSession(), 5000);
 
       setLastHealthCheck(Date.now());
 
       if (error || !session) {
-        console.warn('Health check failed - session invalid');
+        console.warn("Health check failed - session invalid");
         await signOut();
       }
     } catch (error) {
-      console.warn('Health check failed:', error);
+      console.warn("Health check failed:", error);
     }
   }, [isRefreshing, state.user, supabase]);
 
-  // Initialize auth state
+  // ====================================
+  // FIXED: AUTH STATE CHANGE HANDLING
+  // ====================================
+
   useEffect(() => {
     if (!hasValidCache) {
       getSession();
@@ -586,31 +847,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
+      console.log("🔄 Auth state changed:", event);
 
       if (event === "INITIAL_SESSION" && session?.user) {
         const isSuccessfulAuth = window.location.search.includes("?auth=success");
 
-        if (isSuccessfulAuth) {
+        // FIXED: Only process OAuth callback once and only track login on actual OAuth success
+        if (isSuccessfulAuth && !oauthCallbackProcessed.current) {
+          oauthCallbackProcessed.current = true;
+          
           const discordId = getDiscordId(session.user);
-          const username = getUsername(session.user);
-
           if (discordId) {
-            try {
-              await supabase.rpc("upsert_user_login", {
-                target_discord_id: discordId,
-                user_name: username,
-              });
-            } catch (error) {
-              console.error("Failed to track user login:", error);
-            }
-
+            console.log("🎯 Processing OAuth callback for:", discordId);
+            
+            // Track the actual login (increment login_count)
+            await trackUserLogin(session.user as User);
+            
+            // Clean up URL
             router.replace(window.location.pathname);
           }
         }
 
-        const { hasAccess, isTrialActive, isAdmin, canViewAnalytics, canManageUsers } = 
-          await checkUserAccess(session.user as User);
+        // Process user access (this doesn't track login, just checks permissions)
+        const {
+          hasAccess,
+          isTrialActive,
+          isAdmin,
+          canViewAnalytics,
+          canManageUsers,
+        } = await checkUserAccess(session.user as User);
 
         const newState = {
           user: session.user as User,
@@ -644,7 +909,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setHasValidCache(true);
         }
       } else if (event === "SIGNED_OUT") {
+        // Clear all tracking on sign out
         invalidateCache();
+        oauthCallbackProcessed.current = false;
+        currentSessionId.current = null;
+        
         setState({
           user: null,
           session: null,
@@ -657,9 +926,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         setLastUpdated(null);
         setLastHealthCheck(null);
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         if (session?.user) {
-          // Delay to ensure session is fully established
+          // FIXED: Don't track login on token refresh, just refresh user data
           setTimeout(() => {
             refreshUserDataInternal(session);
           }, 1000);
@@ -670,19 +939,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
       if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
-      if (healthCheckIntervalRef.current) clearInterval(healthCheckIntervalRef.current);
+      if (healthCheckIntervalRef.current)
+        clearInterval(healthCheckIntervalRef.current);
     };
   }, [hasValidCache]);
 
-  // Security-conscious health monitoring
+  // ====================================
+  // BACKGROUND INTERVALS
+  // ====================================
+
   useEffect(() => {
     if (state.user && !isRefreshing) {
-      // Set up periodic refresh
       refreshIntervalRef.current = setInterval(() => {
         refreshUserDataInternal();
       }, REFRESH_INTERVAL);
 
-      // Set up health check
       healthCheckIntervalRef.current = setInterval(() => {
         performHealthCheck();
       }, HEALTH_CHECK_INTERVAL);
@@ -700,7 +971,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [state.user, isRefreshing]);
 
-  // Real-time subscription with enhanced security
+  // ====================================
+  // REAL-TIME SUBSCRIPTION
+  // ====================================
+
   useEffect(() => {
     if (!state.user) return;
 
@@ -718,7 +992,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           filter: `discord_id=eq.${discordId}`,
         },
         async (payload) => {
-          console.log("User access changed, refreshing data");
+          console.log("👤 User access changed, refreshing data");
           await refreshUserDataInternal();
         }
       )
@@ -729,6 +1003,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [state.user]);
 
+  // ====================================
+  // CONTEXT VALUE
+  // ====================================
+
   const contextValue: AuthContextType = {
     ...state,
     signInWithDiscord,
@@ -737,14 +1015,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error,
     isRefreshing,
     lastUpdated,
-    checkAdminStatus: () => state.isAdmin, // Return cached status for sync calls
+    checkAdminStatus: () => state.isAdmin,
     invalidateCache,
     getSessionHealth,
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }

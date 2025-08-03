@@ -21,6 +21,12 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'icons.iconarchive.com',
+        port: '',
+        pathname: '/icons/**',
+      },
     ],
     formats: ['image/webp', 'image/avif'],
     // Add image optimization settings

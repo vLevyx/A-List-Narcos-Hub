@@ -1,7 +1,5 @@
 // src/components/ui/CustomDropdown.tsx
-
 'use client'
-
 import { useState, useRef, useEffect } from 'react'
 
 interface Option {
@@ -20,7 +18,7 @@ interface CustomDropdownProps {
 export function CustomDropdown({ value, onChange, options, placeholder, className = '' }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-
+  
   const selectedOption = options.find(option => option.value === value)
 
   useEffect(() => {
@@ -29,7 +27,6 @@ export function CustomDropdown({ value, onChange, options, placeholder, classNam
         setIsOpen(false)
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
@@ -39,11 +36,15 @@ export function CustomDropdown({ value, onChange, options, placeholder, classNam
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="dark-dropdown w-full text-left flex items-center justify-between"
+        className="w-full px-4 py-3 text-left flex items-center justify-between text-white bg-transparent 
+                   focus:outline-none focus:ring-2 focus:ring-[#8b5cf6]/20 rounded-xl transition-all
+                   hover:bg-white/5"
       >
-        <span>{selectedOption?.label || placeholder}</span>
+        <span className={selectedOption?.label ? 'text-white' : 'text-gray-400'}>
+          {selectedOption?.label || placeholder}
+        </span>
         <svg
-          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -51,9 +52,9 @@ export function CustomDropdown({ value, onChange, options, placeholder, classNam
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-
+      
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-lg max-h-60 overflow-auto">
+        <div className="absolute z-50 w-full mt-1 bg-[#2a2a2a] border border-white/20 rounded-xl shadow-lg max-h-60 overflow-auto">
           {options.map((option) => (
             <button
               key={option.value}
@@ -62,7 +63,8 @@ export function CustomDropdown({ value, onChange, options, placeholder, classNam
                 onChange(option.value)
                 setIsOpen(false)
               }}
-              className="w-full px-3 py-2 text-left text-white hover:bg-white/10 transition-colors first:rounded-t-lg last:rounded-b-lg"
+              className="w-full px-4 py-3 text-left text-white hover:bg-white/10 transition-colors 
+                         first:rounded-t-xl last:rounded-b-xl"
             >
               {option.label}
             </button>

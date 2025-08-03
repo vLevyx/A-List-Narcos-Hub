@@ -18,7 +18,7 @@ export function Footer() {
     {
       title: "Support",
       links: [
-        { label: "Discord Server", href: "#", external: true },
+        { label: "Discord Server", href: "https://discord.gg/9HaxJmPSpH", external: true },
         { label: "Documentation", href: "#" },
       ]
     },
@@ -39,9 +39,6 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-1 md:col-span-1">
             <Link href="/" className="flex items-center space-x-3 group mb-4">
-              <div className="w-8 h-8 bg-gradient-to-r from-accent-primary to-accent-secondary rounded-lg flex items-center justify-center">
-                <Shield className="w-5 h-5 text-white" />
-              </div>
               <div className="flex flex-col">
                 <span className="text-lg font-bold gradient-text">
                   A-List Narcos
@@ -73,8 +70,6 @@ export function Footer() {
                         rel="noopener noreferrer"
                         className="text-text-secondary hover:text-accent-primary transition-colors duration-200 text-sm flex items-center group"
                       >
-                        {link.label}
-                        <ExternalLink className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                         {link.label}
                         <ExternalLink className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </a>
@@ -110,7 +105,7 @@ export function Footer() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 text-xs text-text-secondary">
                 <div className="w-2 h-2 bg-accent-primary rounded-full"></div>
-                <span>v0.0.1 | DEVELOPMENT</span>
+                <span>DEVELOPMENT</span>
               </div>
               
               {/* Security Badge */}
