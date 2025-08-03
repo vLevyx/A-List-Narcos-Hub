@@ -17,8 +17,8 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: 'A-List Hub',
-  description: 'Everything you need for ELAN Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
-  keywords: 'ELAN Life, gaming tools, crafting calculator, price planner, weapon compatibility',
+  description: 'Everything you need for Narcos Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
+  keywords: 'Narcos Life, gaming tools, crafting calculator, price planner, weapon compatibility',
   authors: [{ name: 'Levy' }],
   creator: 'The A-List Team',
   icons: {
@@ -28,14 +28,14 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'A-List Hub',
-    description: 'Premium gaming tools for ELAN Life players',
+    description: 'Premium gaming tools for Narcos Life players',
     type: 'website',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'A-List Hub',
-    description: 'Premium gaming tools for ELAN Life players',
+    description: 'Premium gaming tools for Narcos Life players',
   },
   robots: {
     index: true,

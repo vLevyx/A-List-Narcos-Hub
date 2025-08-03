@@ -1,10 +1,7 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/security/page": "app/security/page.js",
-  "/privacy/page": "app/privacy/page.js",
-  "/terms/page": "app/terms/page.js",
-  "/profile/page": "app/profile/page.js",
-  "/calculator/page": "app/calculator/page.js"
+  "/general-info/page": "app/general-info/page.js",
+  "/server-status/page": "app/server-status/page.js",
+  "/profile/page": "app/profile/page.js"
 }

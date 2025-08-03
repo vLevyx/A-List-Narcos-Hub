@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Lock, ExternalLink, ArrowRight } from 'lucide-react'
+import { Lock, ExternalLink, ArrowRight, Activity } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface FeatureCardProps {
@@ -11,7 +11,7 @@ interface FeatureCardProps {
   requiresAccess: boolean
   hasAccess: boolean
   tag?: string
-  tagType?: 'new' | 'updated'
+  tagType?: 'new' | 'updated' | 'live'
   external?: boolean
 }
 
@@ -27,6 +27,19 @@ export function FeatureCard({
 }: FeatureCardProps) {
   const isLocked = requiresAccess && !hasAccess
   
+  const getTagStyles = (type: 'new' | 'updated' | 'live') => {
+    switch (type) {
+      case 'new':
+        return 'bg-gradient-to-r from-green-500 to-emerald-400 text-white'
+      case 'updated':
+        return 'bg-gradient-to-r from-orange-500 to-yellow-400 text-white'
+      case 'live':
+        return 'bg-gradient-to-r from-red-500 to-pink-400 text-white animate-pulse'
+      default:
+        return 'bg-gradient-to-r from-green-500 to-emerald-400 text-white'
+    }
+  }
+  
   const cardContent = (
     <div
       className={cn(
@@ -37,17 +50,18 @@ export function FeatureCard({
       )}
     >
       {/* Tag */}
-      {tag && (
-        <span
-          className={cn(
-            'absolute -top-3 -right-3 text-xs font-bold px-3 py-1 rounded-full shadow-lg z-10',
-            tagType === 'new' 
-              ? 'bg-gradient-to-r from-green-500 to-emerald-400 text-white' 
-              : 'bg-gradient-to-r from-orange-500 to-yellow-400 text-white'
-          )}
-        >
-          {tag}
-        </span>
+      {tag && tagType && (
+        <div className="absolute -top-3 -right-3 z-10">
+          <span
+            className={cn(
+              'text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1',
+              getTagStyles(tagType)
+            )}
+          >
+            {tagType === 'live' && <Activity className="w-3 h-3" />}
+            {tag}
+          </span>
+        </div>
       )}
       
       {/* Icon & Header */}

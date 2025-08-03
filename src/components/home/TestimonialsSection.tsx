@@ -5,28 +5,28 @@ import { Star, Quote } from "lucide-react";
 
 const testimonials = [
   {
-    quote: "The Crafting Calculator saved me hours — can't play without it.",
-    author: "Alexa Knox",
-    role: "A-List Vice President",
+    quote: "Coming Soon...",
+    author: "Coming Soon...",
+    role: "Coming Soon...",
     rating: 5,
   },
   {
-    quote: "Few match the knowledge and experience The A-List brings.",
-    author: "Hamish Macbeth",
-    role: "Community Leader",
+    quote: "Coming Soon...",
+    author: "Coming Soon...",
+    role: "Coming Soon...",
     rating: 5,
   },
   {
-    quote: "Helps with EMS",
-    author: "Stagger Lee",
-    role: "LakeSide EMS",
+    quote: "Coming Soon...",
+    author: "Coming Soon...",
+    role: "Coming Soon...",
     rating: 5,
   },
   {
     quote:
-      "Super helpful and easy tools to use, definitely a must-try for everyone!",
-    author: "Xena Ramirez",
-    role: "New Player",
+      "Coming Soon...",
+    author: "Coming Soon...",
+    role: "Coming Soon...",
     rating: 5,
   },
 ];
