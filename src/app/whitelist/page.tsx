@@ -12,7 +12,7 @@ import { ReferralSelector } from "@/components/ui/ReferralSelector";
 
 // Configuration
 const DISCOUNT_ENABLED = false;
-const ORIGINAL_PRICE = 175000;
+const ORIGINAL_PRICE = 250000;
 const DISCOUNT_RATE = 0.15;
 const DISCOUNTED_PRICE = ORIGINAL_PRICE * (1 - DISCOUNT_RATE);
 
@@ -187,140 +187,151 @@ export default function WhitelistPage() {
   }, [userData, user]);
 
   // Handle form submission
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
+const handleSubmit = useCallback(
+  async (e: React.FormEvent) => {
+    e.preventDefault();
 
-      setStatusMessage({ type: null, message: "" });
+    setStatusMessage({ type: null, message: "" });
 
-      if (!ign.trim()) {
-        setStatusMessage({
-          type: "error",
-          message: "❌ Please enter your in-game name.",
-        });
-        const ignInput = document.getElementById("ign") as HTMLInputElement;
-        if (ignInput) {
-          ignInput.focus();
-        }
-        return;
-      }
-
-      if (ign.trim().length < 2) {
-        setStatusMessage({
-          type: "error",
-          message: "❌ In-game name must be at least 2 characters long.",
-        });
-        return;
-      }
-
-      if (!user) {
-        setStatusMessage({
-          type: "error",
-          message: "❌ You must be logged in to request a trial.",
-        });
-        return;
-      }
-
-      setIsSubmitting(true);
+    if (!ign.trim()) {
       setStatusMessage({
-        type: "info",
-        message: "🔄 Submitting your request...",
+        type: "error",
+        message: "❌ Please enter your in-game name.",
+      });
+      const ignInput = document.getElementById("ign") as HTMLInputElement;
+      if (ignInput) {
+        ignInput.focus();
+      }
+      return;
+    }
+
+    if (ign.trim().length < 2) {
+      setStatusMessage({
+        type: "error",
+        message: "❌ In-game name must be at least 2 characters long.",
+      });
+      return;
+    }
+
+    if (!user) {
+      setStatusMessage({
+        type: "error",
+        message: "❌ You must be logged in to request a trial.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatusMessage({
+      type: "info",
+      message: "🔄 Submitting your request...",
+    });
+
+    try {
+      const discordId = getDiscordId(user);
+      const discordUsername =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        "Discord User";
+      
+      // Get Discord avatar URL
+      const discordAvatar = user.user_metadata?.avatar_url || 
+        `https://cdn.discordapp.com/avatars/${discordId}/${user.user_metadata?.picture?.split('/').pop()?.split('.')[0]}.png` ||
+        null;
+
+      if (!discordId) {
+        throw new Error("Could not determine Discord ID");
+      }
+
+      // Get authentication token
+      const { data: sessionData } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 10000))
+      ]) as { data: any };
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        throw new Error(
+          "Authentication token not found. Please log in again."
+        );
+      }
+
+      // Call your Edge function
+      const response = await withTimeout(
+        fetch(
+          "https://nipdvdcjiszxasjjofsn.supabase.co/functions/v1/sendWhitelistRequest",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              ign: ign.trim(),
+              discordId,
+              discordUsername,
+              discordAvatar,
+              reason: "Premium access request via whitelist form",
+              experience: "intermediate",
+              referral: referral.trim() || null,
+              referralDiscordId: referralDiscordId || null,
+            }),
+          }
+        ),
+        15000
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `Server error: ${response.status}`
+        );
+      }
+
+      setStatusMessage({
+        type: "success",
+        message: "✅ Whitelist request submitted! You now have premium access and a 7-day trial.",
       });
 
-      try {
-        const discordId = getDiscordId(user);
-        const discordUsername =
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          "Discord User";
+      setIgn("");
+      setReferral("");
+      setReferralDiscordId("");
 
-        if (!discordId) {
-          throw new Error("Could not determine Discord ID");
+      // Refresh the page to show the new status
+      setTimeout(() => {
+        window.location.reload();
+      }, 2500);
+
+    } catch (error) {
+      console.error("Error submitting whitelist request:", error);
+
+      let errorMessage =
+        "❌ An unexpected error occurred. Please try again later.";
+
+      if (error instanceof Error) {
+        if (error.message.includes("timeout")) {
+          errorMessage =
+            "❌ Request timeout. Please check your connection and try again.";
+        } else if (error.message.includes("Discord ID")) {
+          errorMessage =
+            "❌ Authentication error. Please log out and log in again.";
+        } else if (error.message.includes("already")) {
+          errorMessage = `❌ ${error.message}`;
+        } else {
+          errorMessage = `❌ ${error.message}`;
         }
-
-        const trialEnds = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
-
-        const { data: sessionData } = await Promise.race([
-          supabase.auth.getSession(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 10000))
-        ]) as { data: any };
-        const token = sessionData.session?.access_token;
-
-        if (!token) {
-          throw new Error(
-            "Authentication token not found. Please log in again."
-          );
-        }
-
-        const response = await withTimeout(
-          fetch(
-            "https://dsexkdjxmhgqahrlkvax.functions.supabase.co/sendDiscordWebhook",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                discordId,
-                discordUsername,
-                ign: ign.trim(),
-                referral: referral.trim() || "None",
-                referralDiscordId: referralDiscordId || null,
-                trialEnds,
-              }),
-            }
-          ),
-          15000
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.error || `Server error: ${response.status}`
-          );
-        }
-
-        setStatusMessage({
-          type: "success",
-          message: "✅ Trial activated! You now have 7 days of premium access.",
-        });
-
-        setIgn("");
-        setReferral("");
-        setReferralDiscordId("");
-
-        setTimeout(() => {
-          window.location.reload();
-        }, 2500);
-      } catch (error) {
-        console.error("Error submitting whitelist request:", error);
-
-        let errorMessage =
-          "❌ An unexpected error occurred. Please try again later.";
-
-        if (error instanceof Error) {
-          if (error.message.includes("timeout")) {
-            errorMessage =
-              "❌ Request timeout. Please check your connection and try again.";
-          } else if (error.message.includes("Discord ID")) {
-            errorMessage =
-              "❌ Authentication error. Please log out and log in again.";
-          } else {
-            errorMessage = `❌ ${error.message}`;
-          }
-        }
-
-        setStatusMessage({
-          type: "error",
-          message: errorMessage,
-        });
-      } finally {
-        setIsSubmitting(false);
       }
-    },
-    [ign, referral, referralDiscordId, user, supabase]
-  );
+
+      setStatusMessage({
+        type: "error",
+        message: errorMessage,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  },
+  [ign, referral, referralDiscordId, user, supabase]
+);
 
   const handleIgnChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -984,33 +995,33 @@ export default function WhitelistPage() {
                       </div>
 
                       <button
-                        type="submit"
-                        disabled={isSubmitting || !ign.trim()}
-                        className="group relative w-full py-4 sm:py-6 px-6 sm:px-8 bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 text-white font-black text-lg sm:text-xl uppercase tracking-wider rounded-2xl shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 overflow-hidden focus:outline-none focus:ring-4 focus:ring-purple-500/30"
-                        aria-label={
-                          isSubmitting
-                            ? "Submitting trial request"
-                            : "Submit trial request"
-                        }
-                      >
-                        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-shimmer"></span>
-                        <span className="relative z-10 flex items-center justify-center gap-3 flex-wrap">
-                          {isSubmitting ? (
-                            <>
-                              <div
-                                className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-t-2 border-b-2 border-white"
-                                aria-hidden="true"
-                              ></div>
-                              <span>Activating Trial...</span>
-                            </>
-                          ) : (
-                            <>
-                              <span aria-hidden="true">🚀</span>
-                              <span>Activate Premium Trial</span>
-                            </>
-                          )}
-                        </span>
-                      </button>
+  type="submit"
+  disabled={isSubmitting || !ign.trim()}
+  className="group relative w-full py-4 sm:py-6 px-6 sm:px-8 bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 text-white font-black text-lg sm:text-xl uppercase tracking-wider rounded-2xl shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 overflow-hidden focus:outline-none focus:ring-4 focus:ring-purple-500/30"
+  aria-label={
+    isSubmitting
+      ? "Submitting whitelist request"
+      : "Submit whitelist request"
+  }
+>
+  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-shimmer"></span>
+  <span className="relative z-10 flex items-center justify-center gap-3 flex-wrap">
+    {isSubmitting ? (
+      <>
+        <div
+          className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-t-2 border-b-2 border-white"
+          aria-hidden="true"
+        ></div>
+        <span>Processing Whitelist...</span>
+      </>
+    ) : (
+      <>
+        <span aria-hidden="true">🚀</span>
+        <span>Activate Premium Trial</span>
+      </>
+    )}
+  </span>
+</button>
 
                       {statusMessage.type && (
                         <div

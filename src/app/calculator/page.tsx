@@ -8,19 +8,533 @@ import { CustomDropdown } from '@/components/ui/CustomDropdown';
 
 const PURPLE_PRIMARY = '#8b5cf6';
 
-interface ComponentRequirement {
-  [componentName: string]: number;
+// ===== ORGANIZED CRAFTING SYSTEM =====
+
+export interface CraftingRequirement {
+  item: string;
+  quantity: number;
 }
 
-interface ItemComponentData {
-  Resources?: ComponentRequirement;
+export interface CraftingRecipe {
+  name: string;
+  category: string;
+  requirements: CraftingRequirement[];
+  craftingLevel: number;
+  craftingTime: number;
+  craftingXP: number;
 }
 
-interface ItemComponents {
-  [category: string]: {
-    [itemName: string]: ItemComponentData;
-  };
+export type CraftingCategory = 
+  | "Weapon Parts"
+  | "Rifles" 
+  | "Handguns"
+  | "Magazines"
+  | "Vest"
+  | "Clothing"
+  | "Backpack"
+  | "Materials";
+
+// Non-craftable materials (can only be found/looted)
+const NON_CRAFTABLE_MATERIALS = new Set([
+  "Kevlar Weave",
+  "Iron bar",
+  "Copper bar", 
+  "Coal",
+  "Diamond",
+  "Saltpeter",
+  "Cloth",
+  "Silver Plating Kit",
+  "Gold Plating Kit",
+  "Blue Dye",
+  "Green Dye",
+  "Pink Dye",
+  "Red Dye",
+  "Tan Dye",
+  "Yellow Dye",
+  "White Dye"
+]);
+
+// Centralized crafting database
+export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
+  // ===== WEAPON PARTS =====
+  "Steel barrel": {
+    name: "Steel barrel",
+    category: "Weapon Parts",
+    requirements: [{ item: "Steel bar", quantity: 12 }],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 10
+  },
+  "Steel receiver": {
+    name: "Steel receiver", 
+    category: "Weapon Parts",
+    requirements: [{ item: "Steel bar", quantity: 12 }],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 10
+  },
+  "Firing pin": {
+    name: "Firing pin",
+    category: "Weapon Parts",
+    requirements: [
+      { item: "Iron bar", quantity: 2 },
+      { item: "Copper bar", quantity: 2 },
+      { item: "Coal", quantity: 1 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 4
+  },
+  "Grip": {
+    name: "Grip",
+    category: "Weapon Parts", 
+    requirements: [
+      { item: "Copper bar", quantity: 2 },
+      { item: "Iron bar", quantity: 2 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 4
+  },
+  "Slide": {
+    name: "Slide",
+    category: "Weapon Parts",
+    requirements: [{ item: "Iron bar", quantity: 2 }],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 4
+  },
+  "Stock": {
+    name: "Stock",
+    category: "Weapon Parts",
+    requirements: [{ item: "Copper bar", quantity: 2 }],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 4
+  },
+  "Trigger": {
+    name: "Trigger",
+    category: "Weapon Parts",
+    requirements: [
+      { item: "Iron bar", quantity: 2 },
+      { item: "Copper bar", quantity: 2 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 4
+  },
+  "Hardened firing pin": {
+    name: "Hardened firing pin",
+    category: "Weapon Parts",
+    requirements: [
+      { item: "Diamond", quantity: 10 },
+      { item: "Firing pin", quantity: 1 },
+      { item: "Steel bar", quantity: 1 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 16,
+    craftingXP: 8
+  },
+
+  // ===== RIFLES =====
+  "AKS74U": {
+    name: "AKS74U",
+    category: "Rifles",
+    requirements: [
+      { item: "Steel barrel", quantity: 3 },
+      { item: "Steel receiver", quantity: 3 },
+      { item: "Hardened firing pin", quantity: 1 },
+      { item: "Grip", quantity: 2 },
+      { item: "Slide", quantity: 2 },
+      { item: "Stock", quantity: 2 },
+      { item: "Trigger", quantity: 1 }
+    ],
+    craftingLevel: 5,
+    craftingTime: 30,
+    craftingXP: 200
+  },
+  "AK74": {
+    name: "AK74",
+    category: "Rifles",
+    requirements: [
+      { item: "Steel barrel", quantity: 4 },
+      { item: "Steel receiver", quantity: 4 },
+      { item: "Hardened firing pin", quantity: 1 },
+      { item: "Grip", quantity: 2 },
+      { item: "Stock", quantity: 3 },
+      { item: "Trigger", quantity: 1 }
+    ],
+    craftingLevel: 8,
+    craftingTime: 30,
+    craftingXP: 300
+  },
+  "Silver AK74": {
+    name: "Silver AK74",
+    category: "Rifles",
+    requirements: [
+      { item: "AK74", quantity: 1 },
+      { item: "Silver Plating Kit", quantity: 1 }
+    ],
+    craftingLevel: 8,
+    craftingTime: 27,
+    craftingXP: 100
+  },
+  "Gold AK74": {
+    name: "Gold AK74",
+    category: "Rifles",
+    requirements: [
+      { item: "AK74", quantity: 1 },
+      { item: "Gold Plating Kit", quantity: 1 }
+    ],
+    craftingLevel: 10,
+    craftingTime: 27,
+    craftingXP: 100
+  },
+  "Mac-10": {
+    name: "Mac-10",
+    category: "Rifles",
+    requirements: [
+      { item: "Steel barrel", quantity: 6 },
+      { item: "Steel receiver", quantity: 4 },
+      { item: "Hardened firing pin", quantity: 1 },
+      { item: "Grip", quantity: 1 },
+      { item: "Stock", quantity: 1 },
+      { item: "Trigger", quantity: 2 }
+    ],
+    craftingLevel: 10,
+    craftingTime: 27,
+    craftingXP: 500
+  },
+  "Spectre": {
+    name: "Spectre",
+    category: "Rifles",
+    requirements: [
+      { item: "Steel barrel", quantity: 2 },
+      { item: "Steel receiver", quantity: 3 },
+      { item: "Firing pin", quantity: 1 },
+      { item: "Grip", quantity: 1 },
+      { item: "Slide", quantity: 1 },
+      { item: "Stock", quantity: 1 },
+      { item: "Trigger", quantity: 1 }
+    ],
+    craftingLevel: 4,
+    craftingTime: 30,
+    craftingXP: 175
+  },
+
+  // ===== HANDGUNS =====
+  "Desert eagle": {
+    name: "Desert eagle",
+    category: "Handguns",
+    requirements: [
+      { item: "Steel barrel", quantity: 1 },
+      { item: "Steel receiver", quantity: 1 },
+      { item: "Firing pin", quantity: 1 },
+      { item: "Grip", quantity: 1 },
+      { item: "Slide", quantity: 1 },
+      { item: "Stock", quantity: 1 },
+      { item: "Trigger", quantity: 1 }
+    ],
+    craftingLevel: 1,
+    craftingTime: 30,
+    craftingXP: 150
+  },
+
+  // ===== MAGAZINES =====
+  "Desert eagle magazine": {
+    name: "Desert eagle magazine",
+    category: "Magazines",
+    requirements: [
+      { item: "Gunpowder", quantity: 3 },
+      { item: "Iron bar", quantity: 1 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 20
+  },
+  "AK Magazine": {
+    name: "AK Magazine",
+    category: "Magazines",
+    requirements: [
+      { item: "Gunpowder", quantity: 5 },
+      { item: "Iron bar", quantity: 1 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 20
+  },
+  "Mac-10 Magazine": {
+    name: "Mac-10 Magazine",
+    category: "Magazines",
+    requirements: [
+      { item: "Gunpowder", quantity: 5 },
+      { item: "Iron bar", quantity: 2 }
+    ],
+    craftingLevel: 10,
+    craftingTime: 7,
+    craftingXP: 25
+  },
+  "Spectre Magazine": {
+    name: "Spectre Magazine",
+    category: "Magazines",
+    requirements: [
+      { item: "Gunpowder", quantity: 5 },
+      { item: "Iron bar", quantity: 1 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 8,
+    craftingXP: 20
+  },
+  "Spectre Drum Magazine": {
+    name: "Spectre Drum Magazine",
+    category: "Magazines",
+    requirements: [
+      { item: "Gunpowder", quantity: 10 },
+      { item: "Iron bar", quantity: 5 }
+    ],
+    craftingLevel: 10,
+    craftingTime: 30,
+    craftingXP: 10
+  },
+
+  // ===== VEST =====
+  "Ballistic vest": {
+    name: "Ballistic vest",
+    category: "Vest",
+    requirements: [
+      { item: "Steel Plate", quantity: 10 },
+      { item: "Kevlar Weave", quantity: 3 }
+    ],
+    craftingLevel: 10,
+    craftingTime: 54,
+    craftingXP: 400
+  },
+
+  // ===== CLOTHING =====
+  "Balaclava Black": {
+    name: "Balaclava Black",
+    category: "Clothing",
+    requirements: [{ item: "Cloth", quantity: 25 }],
+    craftingLevel: 2,
+    craftingTime: 23,
+    craftingXP: 5
+  },
+  "Balaclava Blue": {
+    name: "Balaclava Blue",
+    category: "Clothing",
+    requirements: [
+      { item: "Balaclava Black", quantity: 1 },
+      { item: "Blue Dye", quantity: 1 }
+    ],
+    craftingLevel: 5,
+    craftingTime: 23,
+    craftingXP: 5
+  },
+  "Balaclava Green": {
+    name: "Balaclava Green",
+    category: "Clothing",
+    requirements: [
+      { item: "Balaclava Black", quantity: 1 },
+      { item: "Green Dye", quantity: 1 }
+    ],
+    craftingLevel: 5,
+    craftingTime: 23,
+    craftingXP: 5
+  },
+  "Balaclava Pink": {
+    name: "Balaclava Pink",
+    category: "Clothing",
+    requirements: [
+      { item: "Balaclava Black", quantity: 1 },
+      { item: "Pink Dye", quantity: 1 }
+    ],
+    craftingLevel: 5,
+    craftingTime: 23,
+    craftingXP: 5
+  },
+  "Balaclava Red": {
+    name: "Balaclava Red",
+    category: "Clothing",
+    requirements: [
+      { item: "Balaclava Black", quantity: 1 },
+      { item: "Red Dye", quantity: 1 }
+    ],
+    craftingLevel: 5,
+    craftingTime: 23,
+    craftingXP: 5
+  },
+  "Balaclava Tan": {
+    name: "Balaclava Tan",
+    category: "Clothing",
+    requirements: [
+      { item: "Balaclava Black", quantity: 1 },
+      { item: "Tan Dye", quantity: 1 }
+    ],
+    craftingLevel: 5,
+    craftingTime: 23,
+    craftingXP: 5
+  },
+  "Hiking Pants Blue": {
+    name: "Hiking Pants Blue",
+    category: "Clothing",
+    requirements: [
+      { item: "Cloth", quantity: 25 },
+      { item: "Blue Dye", quantity: 1 }
+    ],
+    craftingLevel: 5,
+    craftingTime: 54,
+    craftingXP: 15
+  },
+  "Hiking Pants Green": {
+    name: "Hiking Pants Green",
+    category: "Clothing",
+    requirements: [
+      { item: "Cloth", quantity: 25 },
+      { item: "Green Dye", quantity: 1 }
+    ],
+    craftingLevel: 5,
+    craftingTime: 54,
+    craftingXP: 15
+  },
+  "Hiking Pants Multicam": {
+    name: "Hiking Pants Multicam",
+    category: "Clothing",
+    requirements: [
+      { item: "Cloth", quantity: 25 },
+      { item: "Green Dye", quantity: 1 }
+    ],
+    craftingLevel: 5,
+    craftingTime: 54,
+    craftingXP: 15
+  },
+  "Hiking Pants Rainbow": {
+    name: "Hiking Pants Rainbow",
+    category: "Clothing",
+    requirements: [
+      { item: "Cloth", quantity: 25 },
+      { item: "Green Dye", quantity: 1 },
+      { item: "Yellow Dye", quantity: 1 },
+      { item: "Red Dye", quantity: 1 },
+      { item: "Pink Dye", quantity: 1 },
+      { item: "Blue Dye", quantity: 1 },
+      { item: "White Dye", quantity: 1 }
+    ],
+    craftingLevel: 15,
+    craftingTime: 54,
+    craftingXP: 500
+  },
+
+  // ===== BACKPACK =====
+  "Upgraded Bergen": {
+    name: "Upgraded Bergen",
+    category: "Backpack",
+    requirements: [{ item: "Cloth", quantity: 75 }],
+    craftingLevel: 8,
+    craftingTime: 54,
+    craftingXP: 20
+  },
+  "Upgraded Bergen Forest": {
+    name: "Upgraded Bergen Forest",
+    category: "Backpack",
+    requirements: [
+      { item: "Cloth", quantity: 75 },
+      { item: "Green Dye", quantity: 1 }
+    ],
+    craftingLevel: 8,
+    craftingTime: 27,
+    craftingXP: 5
+  },
+  "Upgraded Bergen Khaki": {
+    name: "Upgraded Bergen Khaki",
+    category: "Backpack",
+    requirements: [
+      { item: "Cloth", quantity: 75 },
+      { item: "Yellow Dye", quantity: 1 }
+    ],
+    craftingLevel: 8,
+    craftingTime: 27,
+    craftingXP: 5
+  },
+
+  // ===== MATERIALS =====
+  "Steel bar": {
+    name: "Steel bar",
+    category: "Materials",
+    requirements: [
+      { item: "Iron bar", quantity: 2 },
+      { item: "Coal", quantity: 1 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 4,
+    craftingXP: 5
+  },
+  "Gunpowder": {
+    name: "Gunpowder",
+    category: "Materials",
+    requirements: [
+      { item: "Saltpeter", quantity: 2 },
+      { item: "Sulfer", quantity: 1 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 2,
+    craftingXP: 10
+  },
+  "Sulfer": {
+    name: "Sulfer",
+    category: "Materials",
+    requirements: [{ item: "Coal", quantity: 2 }],
+    craftingLevel: 0,
+    craftingTime: 4,
+    craftingXP: 4
+  },
+  "Steel plate": {
+    name: "Steel plate",
+    category: "Materials",
+    requirements: [{ item: "Steel bar", quantity: 10 }],
+    craftingLevel: 0,
+    craftingTime: 16,
+    craftingXP: 20
+  },
+  // Kevlar Weave - non-craftable material (loot only)
+  "Kevlar Weave": {
+    name: "Kevlar Weave",
+    category: "Materials",
+    requirements: [], // No requirements - can only be found
+    craftingLevel: 0,
+    craftingTime: 0,
+    craftingXP: 0
+  }
+};
+
+// ===== UTILITY FUNCTIONS =====
+
+/**
+ * Get all items in a specific category
+ */
+function getItemsByCategory(category: CraftingCategory): string[] {
+  return Object.values(CRAFTING_RECIPES)
+    .filter(recipe => recipe.category === category)
+    .map(recipe => recipe.name)
+    .sort();
 }
+
+/**
+ * Get all available categories
+ */
+function getAllCategories(): CraftingCategory[] {
+  const categories = new Set<CraftingCategory>();
+  Object.values(CRAFTING_RECIPES).forEach(recipe => categories.add(recipe.category as CraftingCategory));
+  return Array.from(categories).sort();
+}
+
+/**
+ * Get crafting recipe for a specific item
+ */
+function getCraftingRecipe(itemName: string): CraftingRecipe | null {
+  return CRAFTING_RECIPES[itemName] || null;
+}
+
+// ===== COMPONENT INTERFACES =====
 
 interface CalculationResults {
   item: string;
@@ -30,72 +544,6 @@ interface CalculationResults {
   totalXP: number;
   craftingLevel: number;
 }
-
-const itemsByCategory = {
-  "Weapon Parts": ["Steel barrel", "Steel receiver", "Firing pin", "Grip", "Slide", "Stock", "Trigger", "Hardened firing pin"],
-  "Rifles": ["AKS74U", "AK47", "Spectre"],
-  "Handguns": ["Desert eagle"],
-  "Magazines": ["Desert eagle magazine", "AK magazine", "Spectre Magazine", "Spectre Drum Magazine"],
-  "Armor": ["Ballistic vest"],
-  "Materials": ["Steel bar", "Gunpowder", "Sulfer", "Steel plate"]
-};
-
-const itemComponents: ItemComponents = {
-  "Weapon Parts": {
-    "Steel barrel": { Resources: { "Steel bar": 12 } },
-    "Steel receiver": { Resources: { "Steel bar": 12 } },
-    "Firing pin": { Resources: { "Iron bar": 2, "Copper bar": 2, "Coal": 1 } },
-    "Grip": { Resources: { "Copper bar": 2, "Iron bar": 2 } },
-    "Slide": { Resources: { "Iron bar": 2 } },
-    "Stock": { Resources: { "Copper bar": 2 } },
-    "Trigger": { Resources: { "Iron bar": 2, "Copper bar": 2 } },
-    "Hardened firing pin": { Resources: { "Diamond": 10, "Firing pin": 1, "Steel bar": 1 } }
-  },
-  "Rifles": {
-    "AKS74U": { Resources: { "Steel barrel": 3, "Steel receiver": 3, "Hardened firing pin": 1, "Grip": 2, "Slide": 2, "Stock": 2, "Trigger": 1 } },
-    "AK47": { Resources: { "Steel barrel": 4, "Steel receiver": 4, "Hardened firing pin": 1, "Grip": 2, "Stock": 3, "Trigger": 1 } },
-    "Spectre": { Resources: { "Steel barrel": 2, "Steel receiver": 3, "Firing pin": 1, "Grip": 1, "Slide": 1, "Stock": 1, "Trigger": 1 } }
-  },
-  "Handguns": {
-    "Desert eagle": { Resources: { "Steel barrel": 1, "Steel receiver": 1, "Firing pin": 1, "Grip": 1, "Slide": 1, "Stock": 1, "Trigger": 1 } }
-  },
-  "Magazines": {
-    "Desert eagle magazine": { Resources: { "Gunpowder": 3, "Iron bar": 1 } },
-    "AK magazine": { Resources: { "Gunpowder": 5, "Iron bar": 1 } },
-    "Spectre Magazine": { Resources: { "Gunpowder": 5, "Iron bar": 1 } },
-    "Spectre Drum Magazine": { Resources: { "Gunpowder": 10, "Iron bar": 5 } }
-  },
-  "Armor": {
-    "Ballistic vest": { Resources: { "Steel plate": 24 } }
-  },
-  "Materials": {
-    "Steel bar": { Resources: { "Iron bar": 2, "Coal": 1 } },
-    "Gunpowder": { Resources: { "Saltpeter": 2, "Sulfer": 1 } },
-    "Sulfer": { Resources: { "Coal": 2 } },
-    "Steel plate": { Resources: { "Steel bar": 10 } }
-  }
-};
-
-const craftingLevels: { [key: string]: number } = {
-  "Steel barrel": 0, "Steel receiver": 0, "Firing pin": 0, "Grip": 0, "Slide": 0, "Stock": 0, "Trigger": 0, "Hardened firing pin": 0,
-  "AKS74U": 5, "AK47": 8, "Spectre": 4, "Desert eagle": 1,
-  "Desert eagle magazine": 0, "AK magazine": 0, "Spectre Magazine": 0, "Spectre Drum Magazine": 10,
-  "Ballistic vest": 10, "Steel bar": 0, "Gunpowder": 0, "Sulfer": 0, "Steel plate": 0
-};
-
-const craftingTimes: { [key: string]: number } = {
-  "Steel barrel": 8, "Steel receiver": 8, "Firing pin": 8, "Grip": 8, "Slide": 8, "Stock": 8, "Trigger": 8, "Hardened firing pin": 16,
-  "AKS74U": 30, "AK47": 30, "Spectre": 30, "Desert eagle": 30,
-  "Desert eagle magazine": 8, "AK magazine": 8, "Spectre Magazine": 8, "Spectre Drum Magazine": 30,
-  "Ballistic vest": 60, "Steel bar": 4, "Gunpowder": 2, "Sulfer": 4, "Steel plate": 16
-};
-
-const craftingXP: { [key: string]: number } = {
-  "Steel barrel": 10, "Steel receiver": 10, "Firing pin": 4, "Grip": 4, "Slide": 4, "Stock": 4, "Trigger": 4, "Hardened firing pin": 8,
-  "AKS74U": 200, "AK47": 300, "Spectre": 175, "Desert eagle": 150,
-  "Desert eagle magazine": 20, "AK magazine": 20, "Spectre Magazine": 20, "Spectre Drum Magazine": 10,
-  "Ballistic vest": 250, "Steel bar": 5, "Gunpowder": 10, "Sulfer": 4, "Steel plate": 20
-};
 
 export default function NarcosCalculatorPage() {
   usePageTracking();
@@ -107,52 +555,97 @@ export default function NarcosCalculatorPage() {
   const [results, setResults] = useState<CalculationResults | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
 
-  // Transform category data for CustomDropdown
+  // Generate category options from the organized data
   const categoryOptions = [
     { value: "", label: "Select Category" },
-    ...Object.keys(itemsByCategory).map(category => ({
+    ...getAllCategories().map(category => ({
       value: category,
       label: category
     }))
   ];
 
-  // Transform item data for CustomDropdown
+  // Generate item options from the organized data
   const itemOptions = [
     { value: "", label: "Select Item" },
-    ...(selectedCategory && itemsByCategory[selectedCategory as keyof typeof itemsByCategory] 
-      ? itemsByCategory[selectedCategory as keyof typeof itemsByCategory].map(item => ({
-          value: item,
-          label: `${item}${craftingLevels[item] > 0 ? ` (Level ${craftingLevels[item]})` : ''}`
-        }))
+    ...(selectedCategory 
+      ? getItemsByCategory(selectedCategory as CraftingCategory).map(item => {
+          const recipe = getCraftingRecipe(item);
+          return {
+            value: item,
+            label: `${item}${recipe && recipe.craftingLevel > 0 ? ` (Level ${recipe.craftingLevel})` : ''}`
+          };
+        })
       : [])
   ];
 
+  /**
+   * Recursively collect all base materials needed for crafting an item
+   * This handles nested requirements like Gold AK74 → AK74 → Steel barrel, etc.
+   */
   const collectBaseResources = (itemName: string, quantity: number): { [key: string]: number } => {
     const resources: { [key: string]: number } = {};
+    const recipe = getCraftingRecipe(itemName);
     
-    let itemData: ItemComponentData | undefined;
-    for (const category of Object.keys(itemComponents)) {
-      if (itemComponents[category][itemName]) {
-        itemData = itemComponents[category][itemName];
-        break;
-      }
-    }
-    
-    if (!itemData || !itemData.Resources) {
+    // If item has no recipe or is non-craftable, treat it as a base resource
+    if (!recipe || recipe.requirements.length === 0 || NON_CRAFTABLE_MATERIALS.has(itemName)) {
       resources[itemName] = quantity;
       return resources;
     }
     
-    for (const [resourceName, resourceQty] of Object.entries(itemData.Resources)) {
-      const totalResourceNeeded = resourceQty * quantity;
-      const subResources = collectBaseResources(resourceName, totalResourceNeeded);
+    // Process each requirement recursively
+    for (const requirement of recipe.requirements) {
+      const totalNeeded = requirement.quantity * quantity;
+      const subResources = collectBaseResources(requirement.item, totalNeeded);
       
+      // Combine resources, handling duplicates
       for (const [subResourceName, subResourceQty] of Object.entries(subResources)) {
         resources[subResourceName] = (resources[subResourceName] || 0) + subResourceQty;
       }
     }
     
     return resources;
+  };
+
+  /**
+   * Calculate total crafting time recursively
+   */
+  const calculateTotalTime = (itemName: string, qty: number): number => {
+    const recipe = getCraftingRecipe(itemName);
+    
+    // If item has no recipe or is non-craftable, no time required
+    if (!recipe || recipe.requirements.length === 0 || NON_CRAFTABLE_MATERIALS.has(itemName)) {
+      return 0;
+    }
+    
+    let totalTime = recipe.craftingTime * qty;
+    
+    // Add time for all sub-components
+    for (const requirement of recipe.requirements) {
+      totalTime += calculateTotalTime(requirement.item, requirement.quantity * qty);
+    }
+    
+    return totalTime;
+  };
+
+  /**
+   * Calculate total crafting XP recursively
+   */
+  const calculateTotalXP = (itemName: string, qty: number): number => {
+    const recipe = getCraftingRecipe(itemName);
+    
+    // If item has no recipe or is non-craftable, no XP gained
+    if (!recipe || recipe.requirements.length === 0 || NON_CRAFTABLE_MATERIALS.has(itemName)) {
+      return 0;
+    }
+    
+    let totalXP = recipe.craftingXP * qty;
+    
+    // Add XP for all sub-components
+    for (const requirement of recipe.requirements) {
+      totalXP += calculateTotalXP(requirement.item, requirement.quantity * qty);
+    }
+    
+    return totalXP;
   };
 
   const calculateMaterials = () => {
@@ -164,48 +657,8 @@ export default function NarcosCalculatorPage() {
     setIsCalculating(true);
     
     setTimeout(() => {
+      const recipe = getCraftingRecipe(selectedItem);
       const baseResources = collectBaseResources(selectedItem, quantity);
-      
-      const calculateTotalTime = (itemName: string, qty: number): number => {
-        let totalTime = (craftingTimes[itemName] || 0) * qty;
-        
-        let itemData: ItemComponentData | undefined;
-        for (const category of Object.keys(itemComponents)) {
-          if (itemComponents[category][itemName]) {
-            itemData = itemComponents[category][itemName];
-            break;
-          }
-        }
-        
-        if (itemData && itemData.Resources) {
-          for (const [resourceName, resourceQty] of Object.entries(itemData.Resources)) {
-            totalTime += calculateTotalTime(resourceName, resourceQty * qty);
-          }
-        }
-        
-        return totalTime;
-      };
-      
-      const calculateTotalXP = (itemName: string, qty: number): number => {
-        let totalXP = (craftingXP[itemName] || 0) * qty;
-        
-        let itemData: ItemComponentData | undefined;
-        for (const category of Object.keys(itemComponents)) {
-          if (itemComponents[category][itemName]) {
-            itemData = itemComponents[category][itemName];
-            break;
-          }
-        }
-        
-        if (itemData && itemData.Resources) {
-          for (const [resourceName, resourceQty] of Object.entries(itemData.Resources)) {
-            totalXP += calculateTotalXP(resourceName, resourceQty * qty);
-          }
-        }
-        
-        return totalXP;
-      };
-      
       const totalTime = calculateTotalTime(selectedItem, quantity);
       const totalXP = calculateTotalXP(selectedItem, quantity);
       
@@ -215,7 +668,7 @@ export default function NarcosCalculatorPage() {
         baseResources,
         totalTime,
         totalXP,
-        craftingLevel: craftingLevels[selectedItem] || 0
+        craftingLevel: recipe?.craftingLevel || 0
       });
       
       setIsCalculating(false);
@@ -362,35 +815,72 @@ export default function NarcosCalculatorPage() {
                     </div>
                   </div>
 
+                  {/* Direct Requirements Section */}
+                  <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
+                    Direct Requirements
+                  </h2>
+
+                  {(() => {
+                    const recipe = getCraftingRecipe(results.item);
+                    return recipe && recipe.requirements.length > 0 ? (
+                      <div className="space-y-2 mb-6">
+                        {recipe.requirements.map((req, index) => (
+                          <div 
+                            key={index}
+                            className="flex justify-between items-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/20"
+                          >
+                            <span className="text-white/90 font-medium">{req.item}</span>
+                            <span className="text-purple-300 font-bold">{(req.quantity * results.quantity).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-gray-400 italic mb-6 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                        This item has no direct crafting requirements (loot-only item)
+                      </div>
+                    );
+                  })()}
+
                   {/* Resources Needed Section */}
                   <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
-                    Resources Needed
+                    Base Materials Needed
                   </h2>
 
                   {Object.keys(results.baseResources).length > 0 && (
-                    <ul className="space-y-1 mb-6">
+                    <div className="space-y-3 mb-6">
                       {Object.entries(results.baseResources)
                         .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([resource, amount]) => (
-                        <li key={resource} className="text-white/90">
-                          {resource}: {(amount as number).toLocaleString()}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {/* Crafting Time Section */}
-                  <div className="mt-6">
-                    <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
-                      Estimated Crafting Time
-                    </h2>
-                    <div className="text-white font-semibold text-lg">
-                      {formatTime(results.totalTime)} total
+                        .map(([resource, amount]) => {
+                          const isNonCraftable = NON_CRAFTABLE_MATERIALS.has(resource);
+                          return (
+                            <div 
+                              key={resource} 
+                              className={`flex justify-between items-center p-3 rounded-lg ${
+                                isNonCraftable 
+                                  ? 'bg-amber-500/10 border border-amber-500/20' 
+                                  : 'bg-blue-500/10 border border-blue-500/20'
+                              }`}
+                            >
+                              <span className="text-white/90 font-medium">{resource}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-white font-bold">{(amount as number).toLocaleString()}</span>
+                                {isNonCraftable && (
+                                  <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-1 rounded">
+                                    Loot Only
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
-                  </div>
+                  )}
 
                   {/* Summary Statistics */}
                   <div className="mt-8">
+                    <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
+                      Summary Statistics
+                    </h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
                         <div className="text-2xl font-bold text-blue-300">{Object.keys(results.baseResources).length}</div>
@@ -412,6 +902,84 @@ export default function NarcosCalculatorPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Resource Breakdown */}
+                  <div className="mt-8">
+                    <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
+                      Resource Breakdown by Component
+                    </h2>
+                    
+                    {(() => {
+                      const recipe = getCraftingRecipe(results.item);
+                      if (!recipe || recipe.requirements.length === 0) {
+                        return (
+                          <div className="text-gray-400 italic p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                            No component breakdown available for loot-only items
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          {recipe.requirements.map((req, index) => {
+                            const componentResources = collectBaseResources(req.item, req.quantity * results.quantity);
+                            const hasResources = Object.keys(componentResources).length > 0;
+                            
+                            return (
+                              <div key={index} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                                <h3 className="text-lg font-semibold text-white mb-3 flex items-center justify-between">
+                                  <span>{req.item}</span>
+                                  <span className="text-sm text-purple-300 font-normal">
+                                    {(req.quantity * results.quantity).toLocaleString()}x needed
+                                  </span>
+                                </h3>
+                                
+                                {hasResources ? (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {Object.entries(componentResources)
+                                      .sort(([a], [b]) => a.localeCompare(b))
+                                      .map(([resource, amount]) => {
+                                        const isNonCraftable = NON_CRAFTABLE_MATERIALS.has(resource);
+                                        return (
+                                          <div 
+                                            key={resource}
+                                            className={`flex justify-between items-center p-2 rounded text-sm ${
+                                              isNonCraftable 
+                                                ? 'bg-amber-500/10 border border-amber-500/20' 
+                                                : 'bg-blue-500/10 border border-blue-500/20'
+                                            }`}
+                                          >
+                                            <span className="text-white/80">{resource}</span>
+                                            <div className="flex items-center gap-1">
+                                              <span className={`font-medium ${
+                                                isNonCraftable ? 'text-amber-300' : 'text-blue-300'
+                                              }`}>
+                                                {(amount as number).toLocaleString()}
+                                              </span>
+                                              {isNonCraftable && (
+                                                <span className="text-xs bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded">
+                                                  Loot
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                ) : (
+                                  <div className="text-amber-300 italic text-sm bg-amber-500/10 border border-amber-500/20 rounded p-2">
+                                    Loot-only item - no crafting materials required
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+
                 </>
               )}
             </div>

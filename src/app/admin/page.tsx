@@ -1,4 +1,3 @@
-// Fixed admin page with proper analytics counting and RLS handling
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -162,7 +161,7 @@ export default function AdminDashboard() {
       let query = supabase
         .from('users')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('last_login', { ascending: false })
         .range((page - 1) * limit, page * limit - 1)
 
       // Apply search filter
@@ -196,25 +195,26 @@ export default function AdminDashboard() {
       console.log('Raw user data:', data) // Debug log
 
       // Calculate access status for each user
-      const usersWithAccess: UserWithAccess[] = (data || []).map(user => {
-        const now = new Date()
-        const isTrialActive = user.hub_trial && 
-          user.trial_expiration && 
-          new Date(user.trial_expiration) > now
-        
-        // Check if user is admin (you might want to add this check)
-        const currentUserDiscordId = getDiscordId(user as any)
-        const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
-        const isUserAdmin = currentUserDiscordId ? adminIds.includes(currentUserDiscordId) : false
-        
-        const hasAccess = !user.revoked && (isTrialActive || isUserAdmin)
+const usersWithAccess: UserWithAccess[] = (data || []).map(user => {
+  const now = new Date()
+  const isTrialActive = user.hub_trial && 
+    user.trial_expiration && 
+    new Date(user.trial_expiration) > now
+  
+  // Check if user is admin (you might want to add this check)
+  const currentUserDiscordId = getDiscordId(user as any)
+  const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
+  const isUserAdmin = currentUserDiscordId ? adminIds.includes(currentUserDiscordId) : false
+  
+  // Fixed logic: User has access if they are NOT revoked (whitelisted) OR have an active trial OR are admin
+  const hasAccess = !user.revoked || isTrialActive || isUserAdmin
 
-        return {
-          ...user,
-          hasAccess,
-          isTrialActive: isTrialActive || false
-        }
-      })
+  return {
+    ...user,
+    hasAccess,
+    isTrialActive: isTrialActive || false
+  }
+})
 
       console.log('Users with access status:', usersWithAccess) // Debug log
       setUsers(usersWithAccess)

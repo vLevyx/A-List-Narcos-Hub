@@ -31,6 +31,7 @@ export function ReferralSelector({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [selectedDiscordId, setSelectedDiscordId] = useState<string>("");
   const [isValidSelection, setIsValidSelection] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -45,65 +46,76 @@ export function ReferralSelector({
     if (!query.trim() || query.trim().length < 2) {
       setSuggestions([]);
       setIsLoading(false);
+      setHasSearched(false);
       return;
     }
 
     console.log("🔍 Starting search for:", query.trim());
-    console.log("🔍 Current user Discord ID:", currentUserDiscordId);
     
     setIsLoading(true);
+    setHasSearched(true);
+    
     try {
       // Create timeout promise
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Search timeout')), 8000);
+        setTimeout(() => reject(new Error('Search timeout')), 10000);
       });
 
-      // Create the database query
-      let supabaseQuery = supabase
+      // Build the query
+      let queryBuilder = supabase
         .from("users")
         .select("discord_id, username")
         .not("username", "is", null)
         .neq("username", "")
-        .ilike("username", `%${query.trim()}%`)
         .order("username", { ascending: true })
-        .limit(15);
+        .limit(20);
 
       // Exclude current user from results
       if (currentUserDiscordId) {
-        supabaseQuery = supabaseQuery.neq("discord_id", currentUserDiscordId);
-        console.log("🔍 Excluding current user:", currentUserDiscordId);
+        queryBuilder = queryBuilder.neq("discord_id", currentUserDiscordId);
       }
+
+      // Search both username and case-insensitive partial matches
+      queryBuilder = queryBuilder.or(`username.ilike.%${query.trim()}%,username.ilike.%${query.trim().toLowerCase()}%,username.ilike.%${query.trim().toUpperCase()}%`);
 
       console.log("🔍 Executing query...");
       
       // Race the query against timeout
       const result = await Promise.race([
-        supabaseQuery,
+        queryBuilder,
         timeoutPromise
       ]) as { data: User[] | null; error: any };
 
-      console.log("🔍 Query response:", result);
+      console.log("🔍 Query result:", result);
 
       if (result.error) {
         console.error("❌ Error searching users:", result.error);
-        console.error("❌ Error details:", result.error.message, result.error.code, result.error.details);
+        
+        // Check if it's an RLS policy error
+        if (result.error.code === '42501' || result.error.message?.includes('policy')) {
+          console.error("❌ RLS Policy Error - User doesn't have permission to search users table");
+          console.error("❌ You may need to update your RLS policies to allow searching");
+        }
+        
         setSuggestions([]);
         return;
       }
 
-      // Additional client-side filter to ensure current user is excluded
+      // Filter results to ensure quality
       const filteredData = (result.data || []).filter(
         (userData) => {
           const isCurrentUser = userData.discord_id === currentUserDiscordId;
           const hasUsername = userData.username && userData.username.trim() !== "";
-          return !isCurrentUser && hasUsername;
+          const matchesSearch = userData.username?.toLowerCase().includes(query.toLowerCase());
+          return !isCurrentUser && hasUsername && matchesSearch;
         }
       );
 
-      console.log("🔍 Filtered results:", filteredData);
+      console.log("🔍 Filtered results:", filteredData.length, "users found");
       setSuggestions(filteredData);
+      
     } catch (error) {
-      console.error("❌ Search timeout or error:", error);
+      console.error("❌ Search error:", error);
       setSuggestions([]);
     } finally {
       setIsLoading(false);
@@ -128,6 +140,7 @@ export function ReferralSelector({
         setIsOpen(false);
         setSelectedDiscordId("");
         setIsValidSelection(false);
+        setHasSearched(false);
         onChange("", "");
         return;
       }
@@ -142,7 +155,7 @@ export function ReferralSelector({
       searchTimeoutRef.current = setTimeout(() => {
         searchUsers(newValue);
         setIsOpen(true);
-      }, 300);
+      }, 500); // Slightly longer delay to reduce API calls
 
       // Update parent with current text value (clear Discord ID since they're typing)
       onChange(newValue, "");
@@ -160,8 +173,9 @@ export function ReferralSelector({
       setIsOpen(false);
       setSuggestions([]);
       setSelectedIndex(-1);
+      setHasSearched(false);
       
-      // Clear any pending search timeouts to prevent searching after selection
+      // Clear any pending search timeouts
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
@@ -174,9 +188,8 @@ export function ReferralSelector({
     [onChange]
   );
 
-  // Handle input focus - only show dropdown if we don't have a selected user
+  // Handle input focus
   const handleInputFocus = useCallback(() => {
-    // Only show existing suggestions if we don't have a valid selection
     if (suggestions.length > 0 && !isValidSelection) {
       setIsOpen(true);
     }
@@ -315,7 +328,7 @@ export function ReferralSelector({
                     {userData.username || `User ${userData.discord_id.slice(0, 8)}...`}
                   </div>
                   <div className="text-xs text-white/60">
-                    ID: {userData.discord_id.slice(0, 8)}...
+                    Discord ID: {userData.discord_id.slice(0, 12)}...
                   </div>
                 </div>
               </div>
@@ -341,27 +354,31 @@ export function ReferralSelector({
         </div>
       )}
 
-      {/* No results message - only show when actively searching and no valid selection */}
-      {isOpen && !isLoading && searchTerm.length >= 2 && suggestions.length === 0 && !isValidSelection && (
+      {/* No results message */}
+      {isOpen && !isLoading && hasSearched && searchTerm.length >= 2 && suggestions.length === 0 && !isValidSelection && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-2 bg-black/90 backdrop-blur-xl border border-purple-500/20 rounded-xl shadow-2xl p-4 text-center text-white/70"
+          className="absolute z-50 w-full mt-2 bg-black/90 backdrop-blur-xl border border-red-500/20 rounded-xl shadow-2xl p-4 text-center"
         >
-          {currentUserDiscordId ? 
-            `No other users found matching "${searchTerm}"` :
-            `No users found matching "${searchTerm}"`
-          }
+          <div className="text-red-400 font-medium mb-1">
+            No users found matching "{searchTerm}"
+          </div>
+          <div className="text-white/60 text-sm">
+            Make sure the Discord username is exact and the user has registered on A-List Hub
+          </div>
         </div>
       )}
 
       {/* Help text */}
       <div id="referral-help" className="mt-2 text-white/60 text-sm">
         {isValidSelection ? (
-          "✅ Valid referral selected"
-        ) : searchTerm.length < 2 && searchTerm.length > 0 ? (
-          "Type at least 2 characters to search"
+          "✅ Valid referral selected - tracking will be applied"
+        ) : searchTerm.length > 0 && searchTerm.length < 2 ? (
+          "Type at least 2 characters to search Discord usernames"
+        ) : isLoading ? (
+          "🔍 Searching A-List users database..."
         ) : (
-          "Start typing to see Discord username suggestions"
+          "Start typing a Discord username to search registered A-List users"
         )}
       </div>
     </div>

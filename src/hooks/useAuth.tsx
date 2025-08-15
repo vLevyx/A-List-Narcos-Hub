@@ -214,208 +214,229 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // ====================================
-  // ADMIN STATUS CHECKING
-  // ====================================
+// ====================================
+// ADMIN STATUS CHECKING
+// ====================================
 
-  const checkAdminStatusSecure = useCallback(
-    async (user?: User): Promise<boolean> => {
-      if (!user && !state.user) return false;
-      const currentUser = user || state.user;
-      if (!currentUser) return false;
+const checkAdminStatusSecure = useCallback(
+  async (user?: User): Promise<boolean> => {
+    if (!user && !state.user) return false;
+    const currentUser = user || state.user;
+    if (!currentUser) return false;
 
-      try {
-        const { data, error } = await supabase.rpc("is_admin");
+    try {
+      const { data, error } = await supabase.rpc("is_admin");
 
-        if (error) {
-          console.error("Error checking admin status:", error);
-          return false;
-        }
-
-        return data === true;
-      } catch (error) {
-        console.error("Failed to check admin status:", error);
+      if (error) {
+        console.error("Error checking admin status:", error);
         return false;
       }
-    },
-    [state.user, supabase]
-  );
 
-  const checkAdminStatusFallback = useCallback(
-    (user?: User): boolean => {
-      const currentUser = user || state.user;
-      if (!currentUser) return false;
+      return data === true;
+    } catch (error) {
+      console.error("Failed to check admin status:", error);
+      return false;
+    }
+  },
+  [state.user, supabase]
+);
 
-      return isUserAdmin(currentUser);
-    },
-    [state.user]
-  );
+const checkAdminStatusFallback = useCallback(
+  (user?: User): boolean => {
+    const currentUser = user || state.user;
+    if (!currentUser) return false;
 
-  const checkAdminStatus = useCallback(
-    async (user?: User): Promise<boolean> => {
-      const currentUser = user || state.user;
-      if (!currentUser) return false;
+    const discordId = getDiscordId(currentUser);
+    if (!discordId) return false;
 
-      const discordId = getDiscordId(currentUser);
-      if (!discordId) return false;
+    const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(",") || [];
+    return adminIds.includes(discordId);
+  },
+  [state.user]
+);
 
-      // Check cache first (5 minute TTL)
-      const cacheKey = `admin-${discordId}`;
-      const cached = adminCheckCacheRef.current.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
-        return cached.result;
+const checkAdminStatus = useCallback(
+  async (user?: User): Promise<boolean> => {
+    const currentUser = user || state.user;
+    if (!currentUser) return false;
+
+    const discordId = getDiscordId(currentUser);
+    if (!discordId) return false;
+
+    // Check cache first (5 minute TTL)
+    const cacheKey = `admin-${discordId}`;
+    const cached = adminCheckCacheRef.current.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
+      return cached.result;
+    }
+
+    // PRIMARY: Use database function
+    try {
+      const { data, error } = await supabase.rpc("is_admin");
+
+      if (error) {
+        throw error;
       }
 
-      // Admin check logic
-      const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(",") || [];
-      let isAdmin = false;
+      const isAdmin = data === true;
 
-      // Force return true for specific Discord ID (your debugging case)
-      if (discordId === "154388953053659137") {
-        isAdmin = true;
-      } else {
-        isAdmin = adminIds.includes(discordId);
-      }
-
-      // Cache the result
+      // Cache the successful result
       adminCheckCacheRef.current.set(cacheKey, {
         result: isAdmin,
         timestamp: Date.now(),
       });
 
       return isAdmin;
-    },
-    [state.user]
-  );
+    } catch (error) {
+      console.error("Database admin check failed, using fallback:", error);
+      
+      // FALLBACK: Use environment variables only if database fails
+      const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(",") || [];
+      const fallbackResult = adminIds.includes(discordId);
 
-  // ====================================
-  // USER ACCESS CHECKING
-  // ====================================
+      // Cache the fallback result (shorter TTL)
+      adminCheckCacheRef.current.set(cacheKey, {
+        result: fallbackResult,
+        timestamp: Date.now() - (4 * 60 * 1000), // Expire in 1 minute instead of 5
+      });
 
-  const checkUserAccess = async (
-    user: User,
-    attempt = 1
-  ): Promise<{
-    hasAccess: boolean;
-    isTrialActive: boolean;
-    isAdmin: boolean;
-    canViewAnalytics: boolean;
-    canManageUsers: boolean;
-    userData?: UserWithAccess;
-  }> => {
-    const discordId = getDiscordId(user);
-    if (!discordId) {
+      return fallbackResult;
+    }
+  },
+  [state.user, supabase]
+);
+
+// ====================================
+// USER ACCESS CHECKING
+// ====================================
+
+const checkUserAccess = async (
+  user: User,
+  attempt = 1
+): Promise<{
+  hasAccess: boolean;
+  isTrialActive: boolean;
+  isAdmin: boolean;
+  canViewAnalytics: boolean;
+  canManageUsers: boolean;
+  userData?: UserWithAccess;
+}> => {
+  const discordId = getDiscordId(user);
+  if (!discordId) {
+    return {
+      hasAccess: false,
+      isTrialActive: false,
+      isAdmin: false,
+      canViewAnalytics: false,
+      canManageUsers: false,
+    };
+  }
+
+  try {
+    // Check admin status using database function
+    const isAdmin = await checkAdminStatus(user);
+
+    // Get user access data (protected by RLS)
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("discord_id", discordId)
+      .single();
+
+    if (error) {
+      if (attempt < MAX_RETRY_ATTEMPTS) {
+        console.warn(`Retry attempt ${attempt} for user access check`);
+        await new Promise((resolve) =>
+          setTimeout(resolve, RETRY_DELAY * attempt)
+        );
+        return checkUserAccess(user, attempt + 1);
+      }
+      throw error;
+    }
+
+    const now = new Date();
+
+    // Check if user is revoked (banned) - admins bypass this
+    if (data.revoked && !isAdmin) {
       return {
         hasAccess: false,
         isTrialActive: false,
-        isAdmin: false,
-        canViewAnalytics: false,
-        canManageUsers: false,
+        isAdmin,
+        canViewAnalytics: isAdmin,
+        canManageUsers: isAdmin,
+        userData: { ...data, hasAccess: false, isTrialActive: false },
       };
     }
 
-    try {
-      const isAdmin = await checkAdminStatus(user);
+    // Check trial status
+    let isTrialActive = false;
+    if (data.hub_trial && data.trial_expiration) {
+      const trialExpiration = new Date(data.trial_expiration);
+      isTrialActive = trialExpiration > now;
 
-      // Get user access data (protected by RLS)
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("discord_id", discordId)
-        .single();
+      // AUTO-REVOKE EXPIRED TRIALS (but not for admins)
+      if (!isTrialActive && !isAdmin) {
+        console.log("Trial expired, auto-revoking user:", discordId);
 
-      if (error) {
-        if (attempt < MAX_RETRY_ATTEMPTS) {
-          console.warn(`Retry attempt ${attempt} for user access check`);
-          await new Promise((resolve) =>
-            setTimeout(resolve, RETRY_DELAY * attempt)
-          );
-          return checkUserAccess(user, attempt + 1);
-        }
-        throw error;
-      }
+        startTransition(() => {
+          supabase
+            .from("users")
+            .update({ revoked: true })
+            .eq("discord_id", discordId)
+            .then(
+              () => console.log("Auto-revoked expired trial:", discordId),
+              (revokeError) =>
+                console.error("Failed to auto-revoke expired trial:", revokeError)
+            );
+        });
 
-      const now = new Date();
-
-      // Check if user is revoked (banned)
-      if (data.revoked && !isAdmin) {
         return {
           hasAccess: false,
           isTrialActive: false,
           isAdmin,
           canViewAnalytics: isAdmin,
           canManageUsers: isAdmin,
-          userData: { ...data, hasAccess: false, isTrialActive: false },
-        };
-      }
-
-      // Check trial status
-      let isTrialActive = false;
-      if (data.hub_trial && data.trial_expiration) {
-        const trialExpiration = new Date(data.trial_expiration);
-        isTrialActive = trialExpiration > now;
-
-        // AUTO-REVOKE EXPIRED TRIALS (but not for admins)
-        if (!isTrialActive && !isAdmin) {
-          console.log("Trial expired, auto-revoking user:", discordId);
-
-          startTransition(() => {
-            supabase
-              .from("users")
-              .update({ revoked: true })
-              .eq("discord_id", discordId)
-              .then(
-                () => console.log("Auto-revoked expired trial:", discordId),
-                (revokeError) =>
-                  console.error("Failed to auto-revoke expired trial:", revokeError)
-              );
-          });
-
-          return {
+          userData: {
+            ...data,
             hasAccess: false,
             isTrialActive: false,
-            isAdmin,
-            canViewAnalytics: isAdmin,
-            canManageUsers: isAdmin,
-            userData: {
-              ...data,
-              hasAccess: false,
-              isTrialActive: false,
-              revoked: true,
-            },
-          };
-        }
+            revoked: true,
+          },
+        };
       }
-
-      // Access determination: Admins ALWAYS have access, regular users need NOT revoked
-      const hasAccess = isAdmin || !data.revoked;
-
-      return {
-        hasAccess,
-        isTrialActive,
-        isAdmin,
-        canViewAnalytics: isAdmin || hasAccess,
-        canManageUsers: isAdmin,
-        userData: { ...data, hasAccess, isTrialActive },
-      };
-    } catch (error) {
-      console.error("Error checking user access:", error);
-      setError(
-        error instanceof Error
-          ? error
-          : new Error("Failed to check user access")
-      );
-
-      const fallbackAdmin = checkAdminStatusFallback(user);
-      return {
-        hasAccess: fallbackAdmin,
-        isTrialActive: false,
-        isAdmin: fallbackAdmin,
-        canViewAnalytics: fallbackAdmin,
-        canManageUsers: fallbackAdmin,
-      };
     }
-  };
+
+    // Access determination: Admins ALWAYS have access
+    const hasAccess = isAdmin || (!data.revoked || isTrialActive);
+
+    return {
+      hasAccess,
+      isTrialActive,
+      isAdmin,
+      canViewAnalytics: isAdmin || hasAccess,
+      canManageUsers: isAdmin,
+      userData: { ...data, hasAccess, isTrialActive },
+    };
+  } catch (error) {
+    console.error("Error checking user access:", error);
+    setError(
+      error instanceof Error
+        ? error
+        : new Error("Failed to check user access")
+    );
+
+    // Emergency fallback using environment variables
+    const fallbackAdmin = checkAdminStatusFallback(user);
+    
+    return {
+      hasAccess: fallbackAdmin,
+      isTrialActive: false,
+      isAdmin: fallbackAdmin,
+      canViewAnalytics: fallbackAdmin,
+      canManageUsers: fallbackAdmin,
+    };
+  }
+};
 
   // ====================================
   // FIXED: USER RECORD MANAGEMENT
