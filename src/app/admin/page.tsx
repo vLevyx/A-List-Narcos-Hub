@@ -128,262 +128,266 @@ export default function AdminDashboard() {
     setLoading(false)
   }, [user, authLoading, isAdmin, router])
 
-  // FIXED: Load users with proper error handling and admin verification
-  const loadUsers = useCallback(async (
-    page: number = 1, 
-    limit: number = 20, 
-    search: string = '', 
-    statusFilter: UserStatusFilter = 'all'
-  ) => {
-    if (!user || !isAdmin) {
-      setStatusMessage({
-        type: 'error',
-        message: 'Admin access required to view users'
-      })
-      return
-    }
-
-    try {
-      setLoadingState(prev => ({ ...prev, users: true }))
-      
-      // First verify admin status server-side using RLS function
-      const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
-      
-      if (adminError) {
-        console.error('Admin verification error:', adminError)
-        throw new Error('Failed to verify admin status')
-      }
-      
-      if (!adminCheck) {
-        throw new Error('Admin privileges required')
-      }
-
-      let query = supabase
-        .from('users')
-        .select('*')
-        .order('last_login', { ascending: false })
-        .range((page - 1) * limit, page * limit - 1)
-
-      // Apply search filter
-      if (search.trim()) {
-        query = query.or(`username.ilike.%${search}%,discord_id.ilike.%${search}%`)
-      }
-
-      // Apply status filter
-      switch (statusFilter) {
-        case 'access':
-          query = query.eq('revoked', false).eq('hub_trial', false)
-          break
-        case 'trial':
-          query = query.eq('hub_trial', true).eq('revoked', false)
-          break
-        case 'revoked':
-          query = query.eq('revoked', true)
-          break
-        case 'pending':
-          query = query.eq('revoked', false).eq('hub_trial', false)
-          break
-      }
-
-      const { data, error } = await query
-
-      if (error) {
-        console.error('Database error:', error)
-        throw error
-      }
-
-      console.log('Raw user data:', data) // Debug log
-
-      // Calculate access status for each user
-const usersWithAccess: UserWithAccess[] = (data || []).map(user => {
-  const now = new Date()
-  const isTrialActive = user.hub_trial && 
-    user.trial_expiration && 
-    new Date(user.trial_expiration) > now
-  
-  // Check if user is admin (you might want to add this check)
-  const currentUserDiscordId = getDiscordId(user as any)
-  const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
-  const isUserAdmin = currentUserDiscordId ? adminIds.includes(currentUserDiscordId) : false
-  
-  // Fixed logic: User has access if they are NOT revoked (whitelisted) OR have an active trial OR are admin
-  const hasAccess = !user.revoked || isTrialActive || isUserAdmin
-
-  return {
-    ...user,
-    hasAccess,
-    isTrialActive: isTrialActive || false
+// Load users with proper error handling and admin verification
+const loadUsers = useCallback(async (
+  page: number = 1, 
+  limit: number = 20, 
+  search: string = '', 
+  statusFilter: UserStatusFilter = 'all'
+) => {
+  if (!user || !isAdmin) {
+    setStatusMessage({
+      type: 'error',
+      message: 'Admin access required to view users'
+    })
+    return
   }
-})
 
-      console.log('Users with access status:', usersWithAccess) // Debug log
-      setUsers(usersWithAccess)
-      
-      setStatusMessage({
-        type: 'success',
-        message: `Loaded ${usersWithAccess.length} users successfully`
-      })
-    } catch (error) {
-      console.error('Error loading users:', error)
-      setStatusMessage({
-        type: 'error',
-        message: `Failed to load users: ${error instanceof Error ? error.message : 'Unknown error'}`
-      })
-    } finally {
-      setLoadingState(prev => ({ ...prev, users: false }))
+  try {
+    setLoadingState(prev => ({ ...prev, users: true }))
+    
+    // First verify admin status server-side using RLS function
+    const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
+    
+    if (adminError) {
+      console.error('Admin verification error:', adminError)
+      throw new Error('Failed to verify admin status')
     }
-  }, [supabase, user, isAdmin])
-
-  // FIXED: Load analytics with proper count handling
-  const loadAnalytics = useCallback(async () => {
-    if (!user || !isAdmin) {
-      setStatusMessage({
-        type: 'error',
-        message: 'Admin access required to view analytics'
-      })
-      return
+    
+    if (!adminCheck) {
+      throw new Error('Admin privileges required')
     }
 
-    try {
-      setLoadingState(prev => ({ ...prev, analytics: true }))
+    let query = supabase
+      .from('users')
+      .select('*')
+      .order('last_login', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1)
+
+    // Apply search filter
+    if (search.trim()) {
+      query = query.or(`username.ilike.%${search}%,discord_id.ilike.%${search}%`)
+    }
+
+    // Apply status filter
+    switch (statusFilter) {
+      case 'access':
+        query = query.eq('revoked', false).eq('hub_trial', false)
+        break
+      case 'trial':
+        query = query.eq('hub_trial', true).eq('revoked', false)
+        break
+      case 'revoked':
+        query = query.eq('revoked', true)
+        break
+      case 'pending':
+        query = query.eq('revoked', false).eq('hub_trial', false)
+        break
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Database error:', error)
+      throw error
+    }
+
+    // FINAL: Calculate access status for each user with optimized admin check
+    const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
+    const now = new Date()
+
+    const usersWithAccess: UserWithAccess[] = (data || []).map(user => {
+      const isTrialActive = user.hub_trial && 
+        user.trial_expiration && 
+        new Date(user.trial_expiration) > now
       
-      // Verify admin status
-      const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
+      // Optimized admin check - use discord_id directly from user object
+      const isUserAdmin = adminIds.includes(user.discord_id)
       
-      if (adminError || !adminCheck) {
-        throw new Error('Admin privileges required')
+      // User has access if they are NOT revoked OR have an active trial OR are admin
+      const hasAccess = !user.revoked || isTrialActive || isUserAdmin
+
+      return {
+        ...user,
+        hasAccess,
+        isTrialActive: isTrialActive || false
       }
+    })
 
-      // FIXED: Use count queries properly
-      const { count: totalUsersCount, error: totalUsersError } = await supabase
+    setUsers(usersWithAccess)
+    
+    setStatusMessage({
+      type: 'success',
+      message: `Loaded ${usersWithAccess.length} users successfully`
+    })
+  } catch (error) {
+    console.error('Error loading users:', error)
+    setStatusMessage({
+      type: 'error',
+      message: `Failed to load users: ${error instanceof Error ? error.message : 'Unknown error'}`
+    })
+  } finally {
+    setLoadingState(prev => ({ ...prev, users: false }))
+  }
+}, [supabase, user, isAdmin])
+
+// Load analytics with optimized queries and proper error handling
+const loadAnalytics = useCallback(async () => {
+  if (!user || !isAdmin) {
+    setStatusMessage({
+      type: 'error',
+      message: 'Admin access required to view analytics'
+    })
+    return
+  }
+
+  try {
+    setLoadingState(prev => ({ ...prev, analytics: true }))
+    
+    // Verify admin status
+    const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
+    
+    if (adminError || !adminCheck) {
+      throw new Error('Admin privileges required')
+    }
+
+    // OPTIMIZED: Use Promise.all for parallel queries
+    const [
+      totalUsersResult,
+      activeTrialsResult,
+      revokedUsersResult,
+      allUsersResult,
+      recentSessionsResult
+    ] = await Promise.all([
+      // Total users count
+      supabase
         .from('users')
-        .select('*', { count: 'exact', head: true })
-
-      if (totalUsersError) {
-        console.error('Total users count error:', totalUsersError)
-        throw totalUsersError
-      }
-
-      const { count: activeTrialsCount, error: activeTrialsError } = await supabase
+        .select('*', { count: 'exact', head: true }),
+      
+      // Active trials count
+      supabase
         .from('users')
         .select('*', { count: 'exact', head: true })
         .eq('hub_trial', true)
-        .eq('revoked', false)
-
-      if (activeTrialsError) {
-        console.error('Active trials count error:', activeTrialsError)
-        throw activeTrialsError
-      }
-
-      const { count: revokedUsersCount, error: revokedUsersError } = await supabase
+        .eq('revoked', false),
+      
+      // Revoked users count
+      supabase
         .from('users')
         .select('*', { count: 'exact', head: true })
-        .eq('revoked', true)
-
-      if (revokedUsersError) {
-        console.error('Revoked users count error:', revokedUsersError)
-        throw revokedUsersError
-      }
-
-      // Get users with access (not revoked and either trial active or admin)
-      const { data: allUsers, error: allUsersError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('revoked', false)
-
-      if (allUsersError) {
-        console.error('All users query error:', allUsersError)
-        throw allUsersError
-      }
-
-      // Calculate users with access
-      const now = new Date()
-      const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
+        .eq('revoked', true),
       
-      const usersWithAccessCount = (allUsers || []).filter(user => {
-        const isTrialActive = user.hub_trial && 
-          user.trial_expiration && 
-          new Date(user.trial_expiration) > now
-        const isUserAdmin = adminIds.includes(user.discord_id)
-        return isTrialActive || isUserAdmin
-      }).length
-
-      // Get recent activity
-      const { data: recentSessions, error: sessionsError } = await supabase
+      // All non-revoked users for access calculation
+      supabase
+        .from('users')
+        .select('discord_id, hub_trial, trial_expiration')
+        .eq('revoked', false),
+      
+      // Recent sessions
+      supabase
         .from('page_sessions')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(10)
+    ])
 
-      if (sessionsError) {
-        console.error('Recent sessions error:', sessionsError)
-        // Don't throw here, just log and continue with empty sessions
-      }
+    // Check for errors in any of the queries
+    const errors = [
+      totalUsersResult.error,
+      activeTrialsResult.error,
+      revokedUsersResult.error,
+      allUsersResult.error
+    ].filter(Boolean)
 
-      const analyticsData: Analytics = {
-        totalUsers: totalUsersCount || 0,
-        activeTrials: activeTrialsCount || 0,
-        revokedUsers: revokedUsersCount || 0,
-        usersWithAccess: usersWithAccessCount,
-        recentSessions: recentSessions || []
-      }
-
-      console.log('Analytics data:', analyticsData) // Debug log
-      setAnalytics(analyticsData)
-      
-      setStatusMessage({
-        type: 'success',
-        message: 'Analytics loaded successfully'
-      })
-    } catch (error) {
-      console.error('Error loading analytics:', error)
-      setStatusMessage({
-        type: 'error',
-        message: `Failed to load analytics: ${error instanceof Error ? error.message : 'Unknown error'}`
-      })
-    } finally {
-      setLoadingState(prev => ({ ...prev, analytics: false }))
-    }
-  }, [supabase, user, isAdmin])
-
-  // Load logs (unchanged, but with admin verification)
-  const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
-    if (!user || !isAdmin) {
-      setStatusMessage({
-        type: 'error',
-        message: 'Admin access required to view logs'
-      })
-      return
+    if (errors.length > 0) {
+      console.error('Analytics query errors:', errors)
+      throw new Error('Failed to load analytics data')
     }
 
-    try {
-      setLoadingState(prev => ({ ...prev, logs: true }))
-      
-      // Verify admin status
-      const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
-      
-      if (adminError || !adminCheck) {
-        throw new Error('Admin privileges required')
-      }
-      
-      const { data, error } = await supabase
-        .from('admin_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range((page - 1) * limit, page * limit - 1)
+    // Calculate users with access efficiently
+    const now = new Date()
+    const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
+    
+    const usersWithAccessCount = (allUsersResult.data || []).filter(user => {
+      const isTrialActive = user.hub_trial && 
+        user.trial_expiration && 
+        new Date(user.trial_expiration) > now
+      const isUserAdmin = adminIds.includes(user.discord_id)
+      return isTrialActive || isUserAdmin
+    }).length
 
-      if (error) throw error
-      setLogs(data || [])
-    } catch (error) {
-      console.error('Error loading logs:', error)
-      setStatusMessage({
-        type: 'error',
-        message: `Failed to load logs: ${error instanceof Error ? error.message : 'Unknown error'}`
-      })
-    } finally {
-      setLoadingState(prev => ({ ...prev, logs: false }))
+    const analyticsData: Analytics = {
+      totalUsers: totalUsersResult.count || 0,
+      activeTrials: activeTrialsResult.count || 0,
+      revokedUsers: revokedUsersResult.count || 0,
+      usersWithAccess: usersWithAccessCount,
+      recentSessions: recentSessionsResult.data || []
     }
-  }, [supabase, user, isAdmin])
+
+    setAnalytics(analyticsData)
+    
+    setStatusMessage({
+      type: 'success',
+      message: 'Analytics loaded successfully'
+    })
+  } catch (error) {
+    console.error('Error loading analytics:', error)
+    setStatusMessage({
+      type: 'error',
+      message: `Failed to load analytics: ${error instanceof Error ? error.message : 'Unknown error'}`
+    })
+  } finally {
+    setLoadingState(prev => ({ ...prev, analytics: false }))
+  }
+}, [supabase, user, isAdmin])
+
+// Load logs with proper admin verification
+const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
+  if (!user || !isAdmin) {
+    setStatusMessage({
+      type: 'error',
+      message: 'Admin access required to view logs'
+    })
+    return
+  }
+
+  try {
+    setLoadingState(prev => ({ ...prev, logs: true }))
+    
+    // Verify admin status
+    const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
+    
+    if (adminError || !adminCheck) {
+      throw new Error('Admin privileges required')
+    }
+    
+    const { data, error } = await supabase
+      .from('admin_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1)
+
+    if (error) {
+      console.error('Logs query error:', error)
+      throw error
+    }
+
+    setLogs(data || [])
+    
+    setStatusMessage({
+      type: 'success',
+      message: `Loaded ${(data || []).length} log entries`
+    })
+  } catch (error) {
+    console.error('Error loading logs:', error)
+    setStatusMessage({
+      type: 'error',
+      message: `Failed to load logs: ${error instanceof Error ? error.message : 'Unknown error'}`
+    })
+  } finally {
+    setLoadingState(prev => ({ ...prev, logs: false }))
+  }
+}, [supabase, user, isAdmin])
 
   // Handle user search with debounce (unchanged)
   const handleUserSearch = useCallback((search: string) => {

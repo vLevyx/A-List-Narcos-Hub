@@ -65,6 +65,43 @@ function requiresAdmin(pathname: string): boolean {
   return routeConfig.adminRequired.some(route => pathname.startsWith(route))
 }
 
+// FIXED: Check admin status using database function (same as client-side)
+async function checkAdminStatus(supabase: any): Promise<boolean> {
+  try {
+    console.log('🔍 Middleware: Checking admin status via database...');
+    
+    const { data, error } = await supabase.rpc('is_admin');
+    
+    if (error) {
+      console.error('❌ Middleware: Database admin check failed:', error);
+      return false;
+    }
+    
+    const isAdmin = data === true;
+    console.log('✅ Middleware: Admin status from database:', isAdmin);
+    return isAdmin;
+  } catch (error) {
+    console.error('💥 Middleware: Exception during admin check:', error);
+    return false;
+  }
+}
+
+// Fallback admin check using environment variables (backup only)
+function checkAdminStatusFallback(user: any): boolean {
+  try {
+    const discordId = user?.user_metadata?.provider_id || user?.user_metadata?.sub;
+    if (!discordId) return false;
+    
+    const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || [];
+    const isAdmin = adminIds.includes(discordId);
+    console.log(`🔄 Middleware: Fallback admin check for ${discordId}:`, isAdmin);
+    return isAdmin;
+  } catch (error) {
+    console.error('💥 Middleware: Fallback admin check failed:', error);
+    return false;
+  }
+}
+
 async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -126,24 +163,36 @@ async function updateSession(request: NextRequest) {
 
     // Route protection logic
     if (requiresAuth(pathname) && !user) {
-      // Redirect to home for protected routes
+      console.log('🚫 Middleware: Auth required, redirecting to home');
       return NextResponse.redirect(new URL('/', request.url))
     }
 
     if (requiresAdmin(pathname)) {
       if (!user) {
+        console.log('🚫 Middleware: Admin route accessed without user, redirecting');
         return NextResponse.redirect(new URL('/', request.url))
       }
       
-      // Check admin status using your existing logic
-      // You can customize this based on your admin checking method
-      const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
-      const isAdmin = user.user_metadata?.provider_id ? 
-        adminIds.includes(user.user_metadata.provider_id) : false
+      console.log('🔍 Middleware: Admin route accessed, checking admin status...');
+      
+      // CRITICAL FIX: Use database function first, then fallback
+      let isAdmin = false;
+      
+      try {
+        // Try database function first (same as client-side)
+        isAdmin = await checkAdminStatus(supabase);
+      } catch (error) {
+        console.error('⚠️ Middleware: Database admin check failed, using fallback');
+        // Use environment variable fallback if database fails
+        isAdmin = checkAdminStatusFallback(user);
+      }
 
       if (!isAdmin) {
+        console.log('🚫 Middleware: User is not admin, redirecting to home');
         return NextResponse.redirect(new URL('/', request.url))
       }
+      
+      console.log('✅ Middleware: Admin access granted');
     }
 
     // Apply security and cache headers
@@ -153,7 +202,7 @@ async function updateSession(request: NextRequest) {
     return response
 
   } catch (error) {
-    console.error('Middleware error:', error)
+    console.error('💥 Middleware error:', error)
     
     // Apply headers even on error
     setSecurityHeaders(response, pathname)
