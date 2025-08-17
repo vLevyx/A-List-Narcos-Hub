@@ -105,7 +105,7 @@ export function Footer() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 text-xs text-text-secondary">
                 <div className="w-2 h-2 bg-accent-primary rounded-full"></div>
-                <span>DEVELOPMENT</span>
+                <span>BETA 0.0.1</span>
               </div>
               
               {/* Security Badge */}

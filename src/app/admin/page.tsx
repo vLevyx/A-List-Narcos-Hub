@@ -8,7 +8,6 @@ import {
   BarChart3, 
   FileText, 
   Search, 
-  Filter, 
   RefreshCw,
   CheckCircle,
   XCircle,
@@ -17,18 +16,22 @@ import {
   AlertTriangle,
   UserCheck,
   UserX,
-  Calendar,
-  Eye,
-  Settings
+  Settings,
+  UserPlus
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { usePageTracking } from '@/hooks/usePageTracking'
 import { createClient } from '@/lib/supabase/client'
-import { getDiscordId, formatDate, timeAgo, formatNumber } from '@/lib/utils'
+import { timeAgo, formatDate } from '@/lib/utils'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Button } from '@/components/ui/Button'
+import { ReferralsSection } from '@/components/admin/ReferralsSection'
+import { AnalyticsTab } from '@/components/admin/AnalyticsTab'
 
-// Types remain the same
+// ====================================
+// INTERFACES
+// ====================================
+
 interface User {
   id: string
   discord_id: string
@@ -56,29 +59,12 @@ interface AdminLog {
   created_at: string | null
 }
 
-interface PageSession {
-  id: string
-  discord_id: string
-  username: string | null
-  page_path: string
-  enter_time: string | null
-  exit_time: string | null
-  time_spent_seconds: number | null
-  is_active: boolean | null
-  created_at: string
-  updated_at: string
-}
-
-interface Analytics {
-  totalUsers: number
-  activeTrials: number
-  revokedUsers: number
-  usersWithAccess: number
-  recentSessions: PageSession[]
-}
-
-type TabType = 'users' | 'analytics' | 'logs'
+type TabType = 'users' | 'analytics' | 'logs' | 'referrals'
 type UserStatusFilter = 'all' | 'access' | 'trial' | 'revoked' | 'pending'
+
+// ====================================
+// MAIN COMPONENT
+// ====================================
 
 export default function AdminDashboard() {
   usePageTracking()
@@ -86,12 +72,14 @@ export default function AdminDashboard() {
   const { user, loading: authLoading, isAdmin } = useAuth()
   const supabase = createClient()
 
-  // State
+  // ====================================
+  // STATE MANAGEMENT
+  // ====================================
+
   const [activeTab, setActiveTab] = useState<TabType>('users')
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<UserWithAccess[]>([])
   const [logs, setLogs] = useState<AdminLog[]>([])
-  const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   
   // Filters and pagination
@@ -104,7 +92,6 @@ export default function AdminDashboard() {
   const [loadingState, setLoadingState] = useState({
     users: false,
     logs: false,
-    analytics: false,
     action: false
   })
   
@@ -115,6 +102,10 @@ export default function AdminDashboard() {
   }>({ type: null, message: '' })
 
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // ====================================
+  // ACCESS CONTROL
+  // ====================================
 
   // Check admin access
   useEffect(() => {
@@ -128,268 +119,166 @@ export default function AdminDashboard() {
     setLoading(false)
   }, [user, authLoading, isAdmin, router])
 
-// Load users with proper error handling and admin verification
-const loadUsers = useCallback(async (
-  page: number = 1, 
-  limit: number = 20, 
-  search: string = '', 
-  statusFilter: UserStatusFilter = 'all'
-) => {
-  if (!user || !isAdmin) {
-    setStatusMessage({
-      type: 'error',
-      message: 'Admin access required to view users'
-    })
-    return
-  }
+  // ====================================
+  // DATA LOADING FUNCTIONS
+  // ====================================
 
-  try {
-    setLoadingState(prev => ({ ...prev, users: true }))
-    
-    // First verify admin status server-side using RLS function
-    const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
-    
-    if (adminError) {
-      console.error('Admin verification error:', adminError)
-      throw new Error('Failed to verify admin status')
-    }
-    
-    if (!adminCheck) {
-      throw new Error('Admin privileges required')
+  // Load users with proper error handling and admin verification
+  const loadUsers = useCallback(async (
+    page: number = 1, 
+    limit: number = 20, 
+    search: string = '', 
+    statusFilter: UserStatusFilter = 'all'
+  ) => {
+    if (!user || !isAdmin) {
+      setStatusMessage({
+        type: 'error',
+        message: 'Admin access required to view users'
+      })
+      return
     }
 
-    let query = supabase
-      .from('users')
-      .select('*')
-      .order('last_login', { ascending: false })
-      .range((page - 1) * limit, page * limit - 1)
-
-    // Apply search filter
-    if (search.trim()) {
-      query = query.or(`username.ilike.%${search}%,discord_id.ilike.%${search}%`)
-    }
-
-    // Apply status filter
-    switch (statusFilter) {
-      case 'access':
-        query = query.eq('revoked', false).eq('hub_trial', false)
-        break
-      case 'trial':
-        query = query.eq('hub_trial', true).eq('revoked', false)
-        break
-      case 'revoked':
-        query = query.eq('revoked', true)
-        break
-      case 'pending':
-        query = query.eq('revoked', false).eq('hub_trial', false)
-        break
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      console.error('Database error:', error)
-      throw error
-    }
-
-    // FINAL: Calculate access status for each user with optimized admin check
-    const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
-    const now = new Date()
-
-    const usersWithAccess: UserWithAccess[] = (data || []).map(user => {
-      const isTrialActive = user.hub_trial && 
-        user.trial_expiration && 
-        new Date(user.trial_expiration) > now
+    try {
+      setLoadingState(prev => ({ ...prev, users: true }))
       
-      // Optimized admin check - use discord_id directly from user object
-      const isUserAdmin = adminIds.includes(user.discord_id)
+      // First verify admin status server-side using RLS function
+      const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
       
-      // User has access if they are NOT revoked OR have an active trial OR are admin
-      const hasAccess = !user.revoked || isTrialActive || isUserAdmin
-
-      return {
-        ...user,
-        hasAccess,
-        isTrialActive: isTrialActive || false
+      if (adminError) {
+        console.error('Admin verification error:', adminError)
+        throw new Error('Failed to verify admin status')
       }
-    })
+      
+      if (!adminCheck) {
+        throw new Error('Admin privileges required')
+      }
 
-    setUsers(usersWithAccess)
-    
-    setStatusMessage({
-      type: 'success',
-      message: `Loaded ${usersWithAccess.length} users successfully`
-    })
-  } catch (error) {
-    console.error('Error loading users:', error)
-    setStatusMessage({
-      type: 'error',
-      message: `Failed to load users: ${error instanceof Error ? error.message : 'Unknown error'}`
-    })
-  } finally {
-    setLoadingState(prev => ({ ...prev, users: false }))
-  }
-}, [supabase, user, isAdmin])
+      let query = supabase
+        .from('users')
+        .select('*')
+        .order('last_login', { ascending: false })
+        .range((page - 1) * limit, page * limit - 1)
 
-// Load analytics with optimized queries and proper error handling
-const loadAnalytics = useCallback(async () => {
-  if (!user || !isAdmin) {
-    setStatusMessage({
-      type: 'error',
-      message: 'Admin access required to view analytics'
-    })
-    return
-  }
+      // Apply search filter
+      if (search.trim()) {
+        query = query.or(`username.ilike.%${search}%,discord_id.ilike.%${search}%`)
+      }
 
-  try {
-    setLoadingState(prev => ({ ...prev, analytics: true }))
-    
-    // Verify admin status
-    const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
-    
-    if (adminError || !adminCheck) {
-      throw new Error('Admin privileges required')
+      // Apply status filter
+      switch (statusFilter) {
+        case 'access':
+          query = query.eq('revoked', false).eq('hub_trial', false)
+          break
+        case 'trial':
+          query = query.eq('hub_trial', true).eq('revoked', false)
+          break
+        case 'revoked':
+          query = query.eq('revoked', true)
+          break
+        case 'pending':
+          query = query.eq('revoked', false).eq('hub_trial', false)
+          break
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Database error:', error)
+        throw error
+      }
+
+      // Calculate access status for each user with optimized admin check
+      const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
+      const now = new Date()
+
+      const usersWithAccess: UserWithAccess[] = (data || []).map(user => {
+        const isTrialActive = user.hub_trial && 
+          user.trial_expiration && 
+          new Date(user.trial_expiration) > now
+        
+        // Optimized admin check - use discord_id directly from user object
+        const isUserAdmin = adminIds.includes(user.discord_id)
+        
+        // User has access if they are NOT revoked OR have an active trial OR are admin
+        const hasAccess = !user.revoked || isTrialActive || isUserAdmin
+
+        return {
+          ...user,
+          hasAccess,
+          isTrialActive: isTrialActive || false
+        }
+      })
+
+      setUsers(usersWithAccess)
+      
+      setStatusMessage({
+        type: 'success',
+        message: `Loaded ${usersWithAccess.length} users successfully`
+      })
+    } catch (error) {
+      console.error('Error loading users:', error)
+      setStatusMessage({
+        type: 'error',
+        message: `Failed to load users: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    } finally {
+      setLoadingState(prev => ({ ...prev, users: false }))
+    }
+  }, [supabase, user, isAdmin])
+
+  // Load logs with proper admin verification
+  const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
+    if (!user || !isAdmin) {
+      setStatusMessage({
+        type: 'error',
+        message: 'Admin access required to view logs'
+      })
+      return
     }
 
-    // OPTIMIZED: Use Promise.all for parallel queries
-    const [
-      totalUsersResult,
-      activeTrialsResult,
-      revokedUsersResult,
-      allUsersResult,
-      recentSessionsResult
-    ] = await Promise.all([
-      // Total users count
-      supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true }),
+    try {
+      setLoadingState(prev => ({ ...prev, logs: true }))
       
-      // Active trials count
-      supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
-        .eq('hub_trial', true)
-        .eq('revoked', false),
+      // Verify admin status
+      const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
       
-      // Revoked users count
-      supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
-        .eq('revoked', true),
+      if (adminError || !adminCheck) {
+        throw new Error('Admin privileges required')
+      }
       
-      // All non-revoked users for access calculation
-      supabase
-        .from('users')
-        .select('discord_id, hub_trial, trial_expiration')
-        .eq('revoked', false),
-      
-      // Recent sessions
-      supabase
-        .from('page_sessions')
+      const { data, error } = await supabase
+        .from('admin_logs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(10)
-    ])
+        .range((page - 1) * limit, page * limit - 1)
 
-    // Check for errors in any of the queries
-    const errors = [
-      totalUsersResult.error,
-      activeTrialsResult.error,
-      revokedUsersResult.error,
-      allUsersResult.error
-    ].filter(Boolean)
+      if (error) {
+        console.error('Logs query error:', error)
+        throw error
+      }
 
-    if (errors.length > 0) {
-      console.error('Analytics query errors:', errors)
-      throw new Error('Failed to load analytics data')
+      setLogs(data || [])
+      
+      setStatusMessage({
+        type: 'success',
+        message: `Loaded ${(data || []).length} log entries`
+      })
+    } catch (error) {
+      console.error('Error loading logs:', error)
+      setStatusMessage({
+        type: 'error',
+        message: `Failed to load logs: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    } finally {
+      setLoadingState(prev => ({ ...prev, logs: false }))
     }
+  }, [supabase, user, isAdmin])
 
-    // Calculate users with access efficiently
-    const now = new Date()
-    const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
-    
-    const usersWithAccessCount = (allUsersResult.data || []).filter(user => {
-      const isTrialActive = user.hub_trial && 
-        user.trial_expiration && 
-        new Date(user.trial_expiration) > now
-      const isUserAdmin = adminIds.includes(user.discord_id)
-      return isTrialActive || isUserAdmin
-    }).length
+  // ====================================
+  // SEARCH AND FILTER HANDLERS
+  // ====================================
 
-    const analyticsData: Analytics = {
-      totalUsers: totalUsersResult.count || 0,
-      activeTrials: activeTrialsResult.count || 0,
-      revokedUsers: revokedUsersResult.count || 0,
-      usersWithAccess: usersWithAccessCount,
-      recentSessions: recentSessionsResult.data || []
-    }
-
-    setAnalytics(analyticsData)
-    
-    setStatusMessage({
-      type: 'success',
-      message: 'Analytics loaded successfully'
-    })
-  } catch (error) {
-    console.error('Error loading analytics:', error)
-    setStatusMessage({
-      type: 'error',
-      message: `Failed to load analytics: ${error instanceof Error ? error.message : 'Unknown error'}`
-    })
-  } finally {
-    setLoadingState(prev => ({ ...prev, analytics: false }))
-  }
-}, [supabase, user, isAdmin])
-
-// Load logs with proper admin verification
-const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
-  if (!user || !isAdmin) {
-    setStatusMessage({
-      type: 'error',
-      message: 'Admin access required to view logs'
-    })
-    return
-  }
-
-  try {
-    setLoadingState(prev => ({ ...prev, logs: true }))
-    
-    // Verify admin status
-    const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
-    
-    if (adminError || !adminCheck) {
-      throw new Error('Admin privileges required')
-    }
-    
-    const { data, error } = await supabase
-      .from('admin_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range((page - 1) * limit, page * limit - 1)
-
-    if (error) {
-      console.error('Logs query error:', error)
-      throw error
-    }
-
-    setLogs(data || [])
-    
-    setStatusMessage({
-      type: 'success',
-      message: `Loaded ${(data || []).length} log entries`
-    })
-  } catch (error) {
-    console.error('Error loading logs:', error)
-    setStatusMessage({
-      type: 'error',
-      message: `Failed to load logs: ${error instanceof Error ? error.message : 'Unknown error'}`
-    })
-  } finally {
-    setLoadingState(prev => ({ ...prev, logs: false }))
-  }
-}, [supabase, user, isAdmin])
-
-  // Handle user search with debounce (unchanged)
+  // Handle user search with debounce
   const handleUserSearch = useCallback((search: string) => {
     setUserSearch(search)
     
@@ -403,7 +292,11 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
     }, 500)
   }, [loadUsers, userLimit, userStatusFilter])
 
-  // Perform user action (unchanged but with better error handling)
+  // ====================================
+  // USER ACTIONS
+  // ====================================
+
+  // Perform user action
   const performUserAction = async (targetDiscordId: string, action: string) => {
     if (!user) return
 
@@ -416,16 +309,8 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
       if (adminError || !adminCheck) {
         throw new Error('Admin privileges required')
       }
-      
-      const adminId = getDiscordId(user)
-      const adminName = user.user_metadata?.full_name || user.user_metadata?.name || 'Admin'
-      
-      if (!adminId) {
-        throw new Error('Could not determine admin ID')
-      }
 
       let description = ''
-      let updateData: any = {}
 
       switch (action) {
         case 'whitelist':
@@ -448,17 +333,6 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
           throw new Error('Invalid action')
       }
 
-      // Log the action
-      await supabase
-        .from('admin_logs')
-        .insert({
-          admin_id: adminId,
-          admin_name: adminName,
-          action,
-          target_discord_id: targetDiscordId,
-          description
-        })
-
       setStatusMessage({
         type: 'success',
         message: `Successfully performed action: ${description}`
@@ -467,7 +341,6 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
       // Reload data
       loadUsers(userPage, userLimit, userSearch, userStatusFilter)
       loadLogs()
-      loadAnalytics()
     } catch (error) {
       console.error('Error performing user action:', error)
       setStatusMessage({
@@ -484,6 +357,10 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
     }
   }
 
+  // ====================================
+  // EFFECTS
+  // ====================================
+
   // Initial load
   useEffect(() => {
     if (loading || !isAdmin) return
@@ -491,8 +368,7 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
     console.log('Loading initial data...') // Debug log
     loadUsers()
     loadLogs()
-    loadAnalytics()
-  }, [loading, isAdmin, loadUsers, loadLogs, loadAnalytics])
+  }, [loading, isAdmin, loadUsers, loadLogs])
 
   // Filter change handler
   useEffect(() => {
@@ -500,6 +376,20 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
     setUserPage(1)
     loadUsers(1, userLimit, userSearch, userStatusFilter)
   }, [userStatusFilter, loading, loadUsers, userLimit, userSearch])
+
+  // Clear status message after some time
+  useEffect(() => {
+    if (statusMessage.type) {
+      const timer = setTimeout(() => {
+        setStatusMessage({ type: null, message: '' })
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [statusMessage])
+
+  // ====================================
+  // RENDER GUARDS
+  // ====================================
 
   if (authLoading || loading) {
     return (
@@ -514,6 +404,10 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
   }
 
   const filteredUsers = users // Already filtered by backend
+
+  // ====================================
+  // MAIN RENDER
+  // ====================================
 
   return (
     <div className="min-h-screen py-8 px-4">
@@ -530,7 +424,7 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
               <span className="gradient-text">Admin Dashboard</span>
             </h1>
             <p className="text-text-secondary">
-              Manage users, view analytics, and monitor system activity
+              Manage users, view analytics, track referrals, and monitor system activity
             </p>
           </div>
           
@@ -539,12 +433,11 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
               onClick={() => {
                 loadUsers(userPage, userLimit, userSearch, userStatusFilter)
                 loadLogs()
-                loadAnalytics()
               }}
               variant="outline"
-              disabled={loadingState.users || loadingState.logs || loadingState.analytics}
+              disabled={loadingState.users || loadingState.logs}
             >
-              {loadingState.users || loadingState.logs || loadingState.analytics ? (
+              {loadingState.users || loadingState.logs ? (
                 <>
                   <LoadingSpinner size="sm" className="mr-2" />
                   Refreshing...
@@ -590,7 +483,8 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
           {[
             { key: 'users', label: 'Users', icon: Users },
             { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-            { key: 'logs', label: 'Logs', icon: FileText }
+            { key: 'logs', label: 'Logs', icon: FileText },
+            { key: 'referrals', label: 'Referrals', icon: UserPlus }
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -614,6 +508,7 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3 }}
         >
+          {/* Users Tab */}
           {activeTab === 'users' && (
             <div className="space-y-6">
               {/* Users Header */}
@@ -793,105 +688,10 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
             </div>
           )}
 
-          {activeTab === 'analytics' && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-semibold text-white">Analytics Overview</h2>
-              
-              {loadingState.analytics ? (
-                <div className="flex items-center justify-center py-12">
-                  <LoadingSpinner size="lg" />
-                  <p className="ml-4 text-white/60">Loading analytics...</p>
-                </div>
-              ) : analytics ? (
-                <>
-                  {/* Stats Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-background-secondary/50 rounded-xl border border-white/10 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-white/60 text-sm font-medium">Total Users</p>
-                          <p className="text-3xl font-bold text-white mt-1">
-                            {analytics.totalUsers}
-                          </p>
-                        </div>
-                        <Users className="w-8 h-8 text-accent-primary" />
-                      </div>
-                    </div>
-                    
-                    <div className="bg-background-secondary/50 rounded-xl border border-white/10 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-white/60 text-sm font-medium">Users with Access</p>
-                          <p className="text-3xl font-bold text-green-400 mt-1">
-                            {analytics.usersWithAccess}
-                          </p>
-                        </div>
-                        <CheckCircle className="w-8 h-8 text-green-400" />
-                      </div>
-                    </div>
-                    
-                    <div className="bg-background-secondary/50 rounded-xl border border-white/10 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-white/60 text-sm font-medium">Active Trials</p>
-                          <p className="text-3xl font-bold text-blue-400 mt-1">
-                            {analytics.activeTrials}
-                          </p>
-                        </div>
-                        <Shield className="w-8 h-8 text-blue-400" />
-                      </div>
-                    </div>
-                    
-                    <div className="bg-background-secondary/50 rounded-xl border border-white/10 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-white/60 text-sm font-medium">Revoked Users</p>
-                          <p className="text-3xl font-bold text-red-400 mt-1">
-                            {analytics.revokedUsers}
-                          </p>
-                        </div>
-                        <XCircle className="w-8 h-8 text-red-400" />
-                      </div>
-                    </div>
-                  </div>
+          {/* Analytics Tab */}
+          {activeTab === 'analytics' && <AnalyticsTab />}
 
-                  {/* Recent Activity */}
-                  <div className="bg-background-secondary/50 rounded-xl border border-white/10 p-6">
-                    <h3 className="text-xl font-semibold text-white mb-4">Recent Activity</h3>
-                    <div className="space-y-3">
-                      {analytics.recentSessions.length === 0 ? (
-                        <p className="text-white/60">No recent activity</p>
-                      ) : (
-                        analytics.recentSessions.map((session) => (
-                          <div key={session.id} className="flex items-center justify-between py-2">
-                            <div className="flex items-center">
-                              <Eye className="w-4 h-4 text-accent-primary mr-3" />
-                              <div>
-                                <p className="text-white font-medium">
-                                  {session.username || 'Unknown User'}
-                                </p>
-                                <p className="text-white/60 text-sm">
-                                  Visited {session.page_path}
-                                </p>
-                              </div>
-                            </div>
-                            <p className="text-white/60 text-sm">
-                              {timeAgo(session.created_at)}
-                            </p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-12">
-                  <p className="text-white/60">Failed to load analytics data</p>
-                </div>
-              )}
-            </div>
-          )}
-
+          {/* Logs Tab */}
           {activeTab === 'logs' && (
             <div className="space-y-6">
               <h2 className="text-2xl font-semibold text-white">Admin Logs</h2>
@@ -951,6 +751,9 @@ const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
               )}
             </div>
           )}
+
+          {/* Referrals Tab */}
+          {activeTab === 'referrals' && <ReferralsSection />}
         </motion.div>
       </div>
     </div>

@@ -30,11 +30,11 @@ interface UserStatus {
 
 // Referral milestone data
 const REFERRAL_MILESTONES = [
-  { count: 3, reward: "$10,000", type: "bonus" },
-  { count: 5, reward: "$75,000", type: "bonus" },
+  { count: 3, reward: "$10,000 Bonus", type: "bonus" },
+  { count: 5, reward: "$75,000 Bonus", type: "bonus" },
   { count: 10, reward: "Early-Beta Access", type: "feature" },
-  { count: 15, reward: "$150,000", type: "bonus" },
-  { count: 20, reward: "$5,000 per referral", type: "ongoing" },
+  { count: 15, reward: "$150,000 Bonus", type: "bonus" },
+  { count: 20, reward: "$50,000 per referral", type: "ongoing" },
 ];
 
 export default function WhitelistPage() {
@@ -712,7 +712,7 @@ const handleSubmit = useCallback(
 
                     {milestone.type === "ongoing" && (
                       <div className="mt-3 text-green-300/80 text-sm">
-                        Every verified referral after 20 earns you $500!
+                        Every verified referral after 20 earns you $50,000!
                       </div>
                     )}
                   </div>

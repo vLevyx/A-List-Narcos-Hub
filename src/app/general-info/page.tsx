@@ -67,10 +67,10 @@ const licenses: License[] = [
     name: "Coal License",
     price: "Free",
     icon: Hammer,
-    description: "Start your mining journey with basic coal extraction rights.",
+    description: "Start your mining journey with basic coal extraction. Mine it, sell it, or use it in crafting. (Note: Coal cannot be processed further.)",
     category: "basic",
     rarity: "common",
-    isRecommended: true
+    isRecommended: false
   },
   {
     id: "sand",

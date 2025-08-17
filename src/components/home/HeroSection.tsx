@@ -94,12 +94,17 @@ export function HeroSection() {
           <motion.div variants={itemVariants} className="text-center">
             <div className="inline-flex items-center gap-2 bg-purple-500/10 backdrop-blur-sm border border-purple-500/20 rounded-full px-4 py-2 mb-8">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <span className="text-sm font-medium text-purple-300">Premium Narcos Life Tools</span>
+              <span className="text-sm font-medium text-purple-300">Premium Roleplay Tools</span>
             </div>
             
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 tracking-tight">
-              <span className="gradient-text">A-List Hub | Narcos</span>
-            </h1>
+            <div className="text-center">
+  <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-2 tracking-tight">
+    <span className="gradient-text">A-List Hub</span>
+  </h1>
+  <div className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-white/80 mb-6">
+    <span className="text-purple-300 font-bold">Narcos</span>
+  </div>
+</div>
             
             <p className="text-xl sm:text-2xl text-white/90 mb-2 font-light">
               Everything you need for <strong className="text-purple-300">Narcos Life</strong>
@@ -192,7 +197,7 @@ export function HeroSection() {
                       {hasAccess ? (
                         <>
                           <Crown className="w-6 h-6" />
-                          <span>Manage Subscription</span>
+                          <span>Refer us, Get paid</span>
                         </>
                       ) : (
                         <>
