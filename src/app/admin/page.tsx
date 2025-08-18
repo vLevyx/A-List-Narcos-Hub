@@ -179,6 +179,7 @@ export default function AdminDashboard() {
 
     try {
       setLoadingState(prev => ({ ...prev, users: true }))
+      console.log('🔄 Loading users...', { page, limit, search, statusFilter, forceRefresh })
       
       // First verify admin status server-side using RLS function
       const { data: adminCheck, error: adminError } = await supabase.rpc('is_admin')
@@ -225,6 +226,7 @@ export default function AdminDashboard() {
         console.error('Database error:', error)
         throw error
       }
+      console.log('✅ Loaded users data:', data?.length)
 
       // Calculate access status for each user with optimized admin check
       const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
@@ -266,7 +268,7 @@ export default function AdminDashboard() {
     } finally {
       setLoadingState(prev => ({ ...prev, users: false }))
     }
-  }, [supabase, user, isAdmin, dataLoadedOnce])
+  }, [supabase, user, isAdmin, dataLoadedOnce, lastManualRefresh])
 
   // Load logs with proper admin verification
   const loadLogs = useCallback(async (page: number = 1, limit: number = 50, forceRefresh: boolean = false) => {
@@ -336,12 +338,15 @@ export default function AdminDashboard() {
   // REAL-TIME SUBSCRIPTIONS
   // ====================================
 
-  // Set up real-time subscriptions for users table
+  // Enhanced real-time subscriptions for immediate updates
   useEffect(() => {
     if (!isAdmin || !dataLoadedOnce) return
 
+    console.log('Setting up enhanced real-time subscriptions...')
+
+    // Users table subscription - triggers on ANY change to users table
     const usersSubscription = supabase
-      .channel('users_changes')
+      .channel('users_realtime_changes')
       .on(
         'postgres_changes',
         {
@@ -350,15 +355,33 @@ export default function AdminDashboard() {
           table: 'users'
         },
         (payload) => {
-          console.log('Users table changed:', payload)
-          // Reload users data when changes occur
+          console.log('🔥 Users table changed in real-time:', payload)
+          // Immediately reload users data
           loadUsers(userPage, userLimit, userSearch, userStatusFilter, true)
         }
       )
       .subscribe()
 
+    // Page sessions subscription - triggers when users go online/offline
+    const sessionsSubscription = supabase
+      .channel('sessions_realtime_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'page_sessions'
+        },
+        (payload) => {
+          console.log('🔥 Session changed in real-time:', payload)
+          // This will trigger the online status updates
+        }
+      )
+      .subscribe()
+
+    // Admin logs subscription
     const logsSubscription = supabase
-      .channel('logs_changes')
+      .channel('logs_realtime_changes')
       .on(
         'postgres_changes',
         {
@@ -367,18 +390,26 @@ export default function AdminDashboard() {
           table: 'admin_logs'
         },
         (payload) => {
-          console.log('Admin logs changed:', payload)
-          // Reload logs when changes occur
+          console.log('🔥 Admin logs changed in real-time:', payload)
           loadLogs(1, 50, true)
         }
       )
       .subscribe()
 
+    // Additional polling for users table every 10 seconds for immediate login detection
+    const usersPollingInterval = setInterval(() => {
+      console.log('🔄 Polling users table for new logins...')
+      loadUsers(userPage, userLimit, userSearch, userStatusFilter, true)
+    }, 10000) // Every 10 seconds
+
     return () => {
-      usersSubscription.unsubscribe()
-      logsSubscription.unsubscribe()
+      console.log('🧹 Cleaning up real-time subscriptions...')
+      supabase.removeChannel(usersSubscription)
+      supabase.removeChannel(sessionsSubscription)  
+      supabase.removeChannel(logsSubscription)
+      clearInterval(usersPollingInterval)
     }
-  }, [isAdmin, dataLoadedOnce, loadUsers, loadLogs, userPage, userLimit, userSearch, userStatusFilter])
+  }, [isAdmin, dataLoadedOnce, loadUsers, loadLogs, userPage, userLimit, userSearch, userStatusFilter, supabase])
 
   // ====================================
   // SEARCH AND FILTER HANDLERS

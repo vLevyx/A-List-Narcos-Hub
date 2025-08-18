@@ -52,27 +52,38 @@ export function useRealtimeSessionMonitoring() {
         throw new Error('Admin privileges required')
       }
 
-      // Get all active sessions
+      // Get all sessions (not just active ones) to determine online status
       const { data: sessions, error: fetchError } = await supabase
         .from('page_sessions')
         .select('*')
-        .eq('is_active', true)
         .order('updated_at', { ascending: false })
 
       if (fetchError) throw fetchError
 
-      setActiveSessions(sessions || [])
+      // Filter truly active sessions (updated within last 2 minutes)
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000)
+      const activeSessions = sessions?.filter(session => 
+        session.is_active && new Date(session.updated_at) > twoMinutesAgo
+      ) || []
+
+      setActiveSessions(activeSessions)
       
-      // Determine online users - users with sessions updated within last 5 minutes
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+      // Determine online users - more aggressive detection
+      // Consider users online if they have ANY session updated within last 3 minutes
+      const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000)
       const onlineUserIds = new Set<string>()
       
       sessions?.forEach(session => {
-        if (session.is_active && new Date(session.updated_at) > fiveMinutesAgo) {
+        // Check if session is recent and active OR was recently active
+        const sessionTime = new Date(session.updated_at)
+        const isRecentlyActive = sessionTime > threeMinutesAgo
+        
+        if (session.is_active && isRecentlyActive) {
           onlineUserIds.add(session.discord_id)
         }
       })
       
+      console.log('Online users detected:', onlineUserIds.size, Array.from(onlineUserIds))
       setOnlineUsers(onlineUserIds)
       setError(null)
     } catch (err) {
@@ -95,28 +106,31 @@ export function useRealtimeSessionMonitoring() {
     // Initial fetch
     fetchActiveSessions()
 
-    // Set up real-time subscription
-    const channel = supabase
-      .channel('active-sessions-admin')
+    // Set up real-time subscription for page_sessions
+    const sessionsChannel = supabase
+      .channel('page-sessions-realtime')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'page_sessions',
-          filter: 'is_active=eq.true'
+          table: 'page_sessions'
         },
-        () => {
+        (payload) => {
+          console.log('Page session changed:', payload)
           fetchActiveSessions()
         }
       )
       .subscribe()
 
-    // Refresh every 30 seconds for live monitoring
-    const interval = setInterval(fetchActiveSessions, 30000)
+    // More frequent refresh for better real-time updates (every 15 seconds)
+    const interval = setInterval(() => {
+      console.log('Refreshing sessions...')
+      fetchActiveSessions()
+    }, 15000)
 
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(sessionsChannel)
       clearInterval(interval)
     }
   }, [user, isCurrentUserAdmin, fetchActiveSessions, supabase])
