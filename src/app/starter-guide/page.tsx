@@ -216,7 +216,7 @@ export default function StarterGuidePage() {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-white/10 text-sm text-text-secondary">
               <div className="flex items-center gap-2">
                 <span className="text-purple-400">Written by:</span>
-                <span className="font-medium text-white">Hamish MacBeth</span>
+                <span className="font-medium text-white">Hamish Macbeth</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-purple-400">Last Updated:</span>
@@ -350,6 +350,33 @@ export default function StarterGuidePage() {
                     ))}
                   </div>
                 )}
+
+                {/* Seatbelt Warning */}
+{step.id === 4 && (
+  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mt-4">
+    <div className="flex items-start gap-3">
+      <AlertTriangle className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+      <div>
+        <div className="text-yellow-400 font-semibold text-sm mb-1">🚗 Seatbelt Safety</div>
+        <p className="text-yellow-300 text-sm mb-2">Always wear your seatbelt when driving to prevent injury during crashes!</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+          <div className="flex items-center gap-1">
+            <span className="text-yellow-400 font-medium">PC:</span>
+            <span className="text-white bg-white/10 px-2 py-1 rounded">B Key</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-yellow-400 font-medium">Xbox:</span>
+            <span className="text-white bg-white/10 px-2 py-1 rounded">Y Button</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-yellow-400 font-medium">PlayStation:</span>
+            <span className="text-white bg-white/10 px-2 py-1 rounded">Triangle</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
                 {/* Warning */}
                 {step.warning && (

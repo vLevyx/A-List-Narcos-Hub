@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { 
   Users, 
@@ -10,7 +10,13 @@ import {
   RefreshCw, 
   AlertCircle,
   CheckCircle,
-  XCircle 
+  XCircle,
+  Wifi,
+  WifiOff,
+  Clock,
+  Server,
+  MapPin,
+  Gamepad2
 } from 'lucide-react'
 
 // Server configuration - moved outside component for performance
@@ -40,19 +46,73 @@ interface ServerData {
   version?: string
 }
 
-// Error boundary for failed server requests
+// Enhanced status indicator component
+const StatusIndicator = ({ 
+  isOnline, 
+  isLoading, 
+  className = "" 
+}: { 
+  isOnline: boolean
+  isLoading: boolean
+  className?: string 
+}) => {
+  if (isLoading) {
+    return (
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-gray-500/20 text-gray-400 border border-gray-500/30 ${className}`}>
+        <RefreshCw className="w-4 h-4 animate-spin" />
+        <span className="hidden sm:inline">Checking...</span>
+        <span className="sm:hidden">•••</span>
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold uppercase tracking-wider ${
+        isOnline 
+          ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+      } ${className}`}
+    >
+      {isOnline ? (
+        <>
+          <Wifi className="w-4 h-4" />
+          <span className="hidden sm:inline">Online</span>
+          <span className="sm:hidden">Online</span>
+        </>
+      ) : (
+        <>
+          <WifiOff className="w-4 h-4" />
+          <span className="hidden sm:inline">Offline</span>
+          <span className="sm:hidden">Off</span>
+        </>
+      )}
+      {isOnline && (
+        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-1" />
+      )}
+    </motion.div>
+  )
+}
+
+
+
+// Enhanced server status card component
 const ServerStatusCard = ({ 
   server, 
   isLoading, 
   error,
   getCapacityClass,
-  lastUpdated 
+  lastUpdated,
+  onRefresh 
 }: {
   server: ServerData | null
   isLoading: boolean
   error: string | null
   getCapacityClass: (percentage: number) => string
   lastUpdated: string
+  onRefresh: () => void
 }) => {
   const isOnline = server?.status === 'online'
   const players = server?.players || 0
@@ -62,19 +122,49 @@ const ServerStatusCard = ({
   const region = server?.region
   const location = region || COUNTRY_NAMES[countryCode] || "Unknown"
 
+  // Memoize server stats to prevent unnecessary re-renders
+  const serverStats = useMemo(() => [
+    {
+      icon: Users,
+      label: 'Players',
+      value: isLoading ? '•••' : `${players}/${maxPlayers}`,
+      description: 'Currently online'
+    },
+    {
+      icon: MapPin,
+      label: 'Location',
+      value: location,
+      description: 'Server region',
+      flag: countryCode && countryCode !== 'unk' ? countryCode : null
+    },
+    {
+      icon: Activity,
+      label: 'Capacity',
+      value: isLoading ? '•••' : `${Math.round(percentage)}%`,
+      description: 'Server load'
+    }
+  ], [isLoading, players, maxPlayers, percentage, location, countryCode])
+
   if (error) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-background-secondary/50 backdrop-blur-xl border border-red-500/20 rounded-xl p-8"
+        className="bg-background-secondary/50 backdrop-blur-xl border border-red-500/20 rounded-xl p-4 sm:p-6 lg:p-8"
       >
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
-            <AlertCircle className="w-8 h-8 text-red-400" />
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 text-red-400" />
           </div>
-          <h3 className="text-xl font-semibold text-red-400">Connection Error</h3>
-          <p className="text-text-secondary">{error}</p>
+          <h3 className="text-lg sm:text-xl font-semibold text-red-400">Connection Error</h3>
+          <p className="text-text-secondary text-sm sm:text-base">{error}</p>
+          <button
+            onClick={onRefresh}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-400 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try Again
+          </button>
         </div>
       </motion.div>
     )
@@ -85,76 +175,69 @@ const ServerStatusCard = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="bg-background-secondary/50 backdrop-blur-xl border border-white/10 rounded-xl p-8 hover:border-accent-primary/30 transition-all duration-300"
+      className="bg-background-secondary/50 backdrop-blur-xl border border-white/10 rounded-xl p-4 sm:p-6 lg:p-8 hover:border-accent-primary/30 transition-all duration-300"
     >
       {/* Server Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-text-primary mb-1">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div className="flex-1 min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold text-text-primary mb-1 truncate">
             {server?.name || SERVER_NAME}
           </h2>
-          <p className="text-text-secondary">Arma Reforger Server</p>
+          <div className="flex items-center gap-2 text-text-secondary text-sm">
+            <Server className="w-4 h-4 flex-shrink-0" />
+            <span>Arma Reforger Server</span>
+          </div>
         </div>
         
-        <div className={`px-4 py-2 rounded-lg text-sm font-semibold uppercase tracking-wider flex items-center gap-2 ${
-          isOnline 
-            ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-            : 'bg-red-500/20 text-red-400 border border-red-500/30'
-        }`}>
-          {isOnline ? (
-            <CheckCircle className="w-4 h-4" />
-          ) : (
-            <XCircle className="w-4 h-4" />
-          )}
-          {isOnline ? 'Online' : 'Offline'}
+        <div className="flex items-center gap-3">
+          <StatusIndicator isOnline={isOnline} isLoading={isLoading} />
+          
+          <button
+            onClick={onRefresh}
+            disabled={isLoading}
+            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-accent-primary/30 transition-all duration-200 disabled:opacity-50"
+            title="Refresh server status"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
       {/* Server Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        {/* Players */}
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="flex items-center gap-3 mb-2">
-            <Users className="w-5 h-5 text-accent-primary" />
-            <span className="text-sm text-text-secondary uppercase tracking-wider">Players</span>
-          </div>
-          <div className="text-2xl font-bold text-text-primary" aria-live="polite">
-            {isLoading ? '•••' : `${players}/${maxPlayers}`}
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="flex items-center gap-3 mb-2">
-            <Globe className="w-5 h-5 text-accent-primary" />
-            <span className="text-sm text-text-secondary uppercase tracking-wider">Location</span>
-          </div>
-          <div className="text-xl font-semibold text-text-primary flex items-center gap-2">
-            {location}
-            {countryCode && countryCode !== 'unk' && (
-              <Image 
-                src={`https://flagcdn.com/h20/${countryCode}.png`}
-                alt={`${COUNTRY_NAMES[countryCode] || countryCode} flag`}
-                width={20}
-                height={15}
-                className="rounded-sm"
-                loading="lazy"
-                unoptimized={true}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Capacity */}
-        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-          <div className="flex items-center gap-3 mb-2">
-            <Activity className="w-5 h-5 text-accent-primary" />
-            <span className="text-sm text-text-secondary uppercase tracking-wider">Capacity</span>
-          </div>
-          <div className="text-xl font-semibold text-text-primary" aria-live="polite">
-            {isLoading ? '•••' : `${Math.round(percentage)}%`}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6">
+        {serverStats.map(({ icon: Icon, label, value, description, flag }, index) => (
+          <motion.div
+            key={label}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+            className="bg-white/5 rounded-lg p-3 sm:p-4 border border-white/10 hover:border-white/20 transition-colors"
+          >
+            <div className="flex items-center gap-2 sm:gap-3 mb-2">
+              <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-accent-primary flex-shrink-0" />
+              <span className="text-xs sm:text-sm text-text-secondary uppercase tracking-wider">
+                {label}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-text-primary" aria-live="polite">
+                {value}
+              </div>
+              {flag && (
+                <Image 
+                  src={`https://flagcdn.com/h20/${flag}.png`}
+                  alt={`${COUNTRY_NAMES[flag] || flag} flag`}
+                  width={20}
+                  height={15}
+                  className="rounded-sm flex-shrink-0"
+                  loading="lazy"
+                  unoptimized={true}
+                />
+              )}
+            </div>
+            <p className="text-xs text-text-secondary mt-1">{description}</p>
+          </motion.div>
+        ))}
       </div>
 
       {/* Progress Bar */}
@@ -166,7 +249,7 @@ const ServerStatusCard = ({
           </span>
         </div>
         <div 
-          className="h-2 bg-white/10 rounded-full overflow-hidden" 
+          className="h-2 sm:h-3 bg-white/10 rounded-full overflow-hidden" 
           role="progressbar" 
           aria-valuenow={percentage} 
           aria-valuemin={0} 
@@ -182,66 +265,92 @@ const ServerStatusCard = ({
       </div>
 
       {/* Additional Server Info */}
-      {server && (
-        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-          {server.map && (
-            <div>
-              <span className="text-xs text-text-secondary uppercase tracking-wider">Map</span>
-              <div className="text-sm font-medium text-text-primary">{server.map}</div>
-            </div>
-          )}
-          {server.gameMode && (
-            <div>
-              <span className="text-xs text-text-secondary uppercase tracking-wider">Game Mode</span>
-              <div className="text-sm font-medium text-text-primary">{server.gameMode}</div>
-            </div>
-          )}
-        </div>
-      )}
+      <AnimatePresence>
+        {server && (server.map || server.gameMode) && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 mb-4 border-t border-white/10"
+          >
+            {server.map && (
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Globe className="w-3 h-3 text-accent-primary" />
+                  <span className="text-xs text-text-secondary uppercase tracking-wider">Map</span>
+                </div>
+                <div className="text-sm font-medium text-text-primary">{server.map}</div>
+              </div>
+            )}
+            {server.gameMode && (
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Gamepad2 className="w-3 h-3 text-accent-primary" />
+                  <span className="text-xs text-text-secondary uppercase tracking-wider">Game Mode</span>
+                </div>
+                <div className="text-sm font-medium text-text-primary">{server.gameMode}</div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Last Updated */}
-      <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/10">
+      {/* Footer */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-white/10">
+        {/* Last Updated */}
         <div className="flex items-center gap-2 text-xs text-text-secondary">
-          <RefreshCw className="w-3 h-3" />
+          <Clock className="w-3 h-3" />
           <span aria-live="polite">
             Last updated: {lastUpdated || 'Never'}
           </span>
         </div>
         
-        {isOnline && (
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-xs text-green-400">Live</span>
+        {/* Server ID and Live indicator */}
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-text-secondary">
+            Server ID: {SERVER_ID}
           </div>
-        )}
+          
+          {/* Live indicator */}
+          {isOnline && (
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-xs text-green-400">Live</span>
+            </div>
+          )}
+        </div>
       </div>
     </motion.div>
   )
 }
 
-// Loading skeleton component
+// Enhanced loading skeleton component
 const LoadingSkeleton = () => (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
-    className="bg-background-secondary/50 backdrop-blur-xl border border-white/10 rounded-xl p-8"
+    className="bg-background-secondary/50 backdrop-blur-xl border border-white/10 rounded-xl p-4 sm:p-6 lg:p-8"
   >
     <div className="animate-pulse space-y-6">
       {/* Header skeleton */}
-      <div className="flex justify-between items-center">
-        <div>
-          <div className="h-8 bg-white/10 rounded w-48 mb-2"></div>
-          <div className="h-4 bg-white/5 rounded w-32"></div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div className="flex-1">
+          <div className="h-6 sm:h-8 bg-white/10 rounded w-3/4 sm:w-48 mb-2"></div>
+          <div className="h-4 bg-white/5 rounded w-1/2 sm:w-32"></div>
         </div>
-        <div className="h-8 bg-white/5 rounded w-20"></div>
+        <div className="flex items-center gap-3">
+          <div className="h-8 bg-white/5 rounded w-20"></div>
+          <div className="h-8 w-8 bg-white/5 rounded"></div>
+        </div>
       </div>
 
       {/* Stats grid skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div key={i} className="bg-white/5 rounded-lg p-3 sm:p-4 border border-white/10">
             <div className="h-4 bg-white/5 rounded w-16 mb-2"></div>
-            <div className="h-6 bg-white/10 rounded w-20"></div>
+            <div className="h-5 sm:h-6 bg-white/10 rounded w-20"></div>
+            <div className="h-3 bg-white/5 rounded w-24 mt-1"></div>
           </div>
         ))}
       </div>
@@ -252,21 +361,28 @@ const LoadingSkeleton = () => (
           <div className="h-3 bg-white/5 rounded w-24"></div>
           <div className="h-3 bg-white/5 rounded w-16"></div>
         </div>
-        <div className="h-2 bg-white/5 rounded-full"></div>
+        <div className="h-2 sm:h-3 bg-white/5 rounded-full"></div>
+      </div>
+
+      {/* Footer skeleton */}
+      <div className="flex flex-col sm:flex-row sm:justify-between gap-3 pt-4 border-t border-white/10">
+        <div className="h-3 bg-white/5 rounded w-32"></div>
+        <div className="flex items-center gap-2">
+          <div className="h-3 bg-white/5 rounded w-16"></div>
+          <div className="h-6 bg-white/5 rounded w-20"></div>
+        </div>
       </div>
     </div>
   </motion.div>
 )
 
 export default function NarcosServerStatusPage() {
-  // Note: Removed usePageTracking to make this a truly public page
-  // If you want to track anonymous visitors, you can add it back with proper handling
-
   // State management
   const [serverData, setServerData] = useState<ServerData | null>(null)
   const [lastUpdated, setLastUpdated] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(true)
   
   // Refs for cleanup
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -282,11 +398,13 @@ export default function NarcosServerStatusPage() {
   }, [])
 
   // Optimized fetch using our API route to avoid CORS issues
-  const fetchServerData = useCallback(async () => {
+  const fetchServerData = useCallback(async (isManualRefresh: boolean = false) => {
     if (!isMountedRef.current) return
 
     try {
-      setIsLoading(true)
+      if (isManualRefresh) {
+        setIsLoading(true)
+      }
       setError(null)
       
       // Cancel previous request
@@ -355,13 +473,15 @@ export default function NarcosServerStatusPage() {
     }
   }, [])
 
+  // Manual refresh handler
+  const handleManualRefresh = useCallback(() => {
+    fetchServerData(true)
+  }, [fetchServerData])
+
   // Initialize and set up polling
   useEffect(() => {
     isMountedRef.current = true
-    fetchServerData()
-    
-    // Set up interval for updates every minute
-    updateIntervalRef.current = setInterval(fetchServerData, UPDATE_INTERVAL)
+    fetchServerData(true)
     
     return () => {
       isMountedRef.current = false
@@ -376,6 +496,23 @@ export default function NarcosServerStatusPage() {
     }
   }, [fetchServerData])
 
+  // Auto-refresh interval management
+  useEffect(() => {
+    if (isAutoRefreshEnabled) {
+      updateIntervalRef.current = setInterval(() => fetchServerData(false), UPDATE_INTERVAL)
+    } else {
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current)
+      }
+    }
+
+    return () => {
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current)
+      }
+    }
+  }, [isAutoRefreshEnabled, fetchServerData])
+
   // Handle page visibility to pause updates when tab is hidden
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -385,9 +522,9 @@ export default function NarcosServerStatusPage() {
         if (updateIntervalRef.current) {
           clearInterval(updateIntervalRef.current)
         }
-      } else {
-        fetchServerData()
-        updateIntervalRef.current = setInterval(fetchServerData, UPDATE_INTERVAL)
+      } else if (isAutoRefreshEnabled) {
+        fetchServerData(false)
+        updateIntervalRef.current = setInterval(() => fetchServerData(false), UPDATE_INTERVAL)
       }
     }
 
@@ -396,15 +533,15 @@ export default function NarcosServerStatusPage() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [fetchServerData])
+  }, [fetchServerData, isAutoRefreshEnabled])
 
   return (
-    <div className="min-h-screen py-8 px-4 relative">
+    <div className="min-h-screen py-4 sm:py-8 px-4 relative">
       {/* Enhanced Background Effects - matching your project style */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-purple-800/20" />
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/4 left-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000" />
       </div>
 
       <div className="max-w-4xl mx-auto relative z-10">
@@ -413,15 +550,42 @@ export default function NarcosServerStatusPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-8"
+          className="text-center mb-6 sm:mb-8"
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-2">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2">
             <span className="gradient-text">Narcos Life</span>
           </h1>
-          <p className="text-text-secondary text-lg">
+          <p className="text-text-secondary text-sm sm:text-base lg:text-lg px-4">
             Live Server Status - Real-time player information and server statistics
           </p>
         </motion.header>
+
+        {/* Auto-refresh toggle */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="flex justify-center mb-6"
+        >
+          <div className="flex items-center gap-3 bg-background-secondary/30 rounded-lg p-3 border border-white/10">
+            <span className="text-sm text-text-secondary">Auto-refresh</span>
+            <button
+              onClick={() => setIsAutoRefreshEnabled(!isAutoRefreshEnabled)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                isAutoRefreshEnabled ? 'bg-accent-primary' : 'bg-white/20'
+              }`}
+            >
+              <motion.div
+                className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full"
+                animate={{ x: isAutoRefreshEnabled ? 24 : 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
+            <span className="text-xs text-text-secondary">
+              {isAutoRefreshEnabled ? 'Every minute' : 'Manual only'}
+            </span>
+          </div>
+        </motion.div>
 
         {/* Server Status Card */}
         <main aria-label="Server Status Information">
@@ -434,6 +598,7 @@ export default function NarcosServerStatusPage() {
               error={error}
               getCapacityClass={getCapacityClass}
               lastUpdated={lastUpdated}
+              onRefresh={handleManualRefresh}
             />
           )}
         </main>
@@ -443,15 +608,15 @@ export default function NarcosServerStatusPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="mt-8 text-center"
+          className="mt-6 sm:mt-8 text-center"
         >
-          <div className="bg-background-secondary/30 rounded-lg p-4 border border-white/10">
-            <p className="text-sm text-text-secondary mb-2">
-              Updates automatically every minute • Data provided by BattleMetrics
+          <div className="bg-background-secondary/30 rounded-lg p-3 sm:p-4 border border-white/10">
+            <p className="text-xs sm:text-sm text-text-secondary mb-2">
+              {isAutoRefreshEnabled ? 'Updates automatically every minute' : 'Manual refresh only'} • Data provided by BattleMetrics
             </p>
-            <div className="flex items-center justify-center gap-4 text-xs text-text-secondary">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-xs text-text-secondary">
               <span>Server ID: {SERVER_ID}</span>
-              <span>•</span>
+              <span className="hidden sm:inline">•</span>
               <span>Arma Reforger</span>
             </div>
           </div>

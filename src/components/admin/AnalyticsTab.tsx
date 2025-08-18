@@ -10,9 +10,12 @@ import {
   Eye, 
   Clock,
   BarChart3,
-  RefreshCw
+  RefreshCw,
+  Activity,
+  Globe
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { useRealtimeSessionMonitoring } from '@/hooks/useRealtimeSessionMonitoring'
 import { createClient } from '@/lib/supabase/client'
 import { timeAgo, formatNumber } from '@/lib/utils'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
@@ -102,11 +105,18 @@ export function AnalyticsTab() {
   const { user, isAdmin } = useAuth()
   const supabase = createClient()
 
+  // Real-time session monitoring
+  const { 
+    onlineUsers, 
+    activeSessions, 
+    loading: sessionLoading,
+    refreshSessions
+  } = useRealtimeSessionMonitoring()
+
   // State management
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [pageAnalytics, setPageAnalytics] = useState<PageAnalytics[]>([])
   const [activeUsers, setActiveUsers] = useState<UserAnalytics[]>([])
-  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
   const [timeUnit, setTimeUnit] = useState<"m" | "h" | "d">("m")
   
   // Loading states
@@ -261,7 +271,7 @@ export function AnalyticsTab() {
     }
   }, [supabase, user, isAdmin])
 
-  // Load user analytics (active users in last 24 hours)
+  // Load user analytics (active users in last 24 hours) with online status
   const loadUserAnalytics = useCallback(async () => {
     if (!user || !isAdmin) return
 
@@ -294,33 +304,21 @@ export function AnalyticsTab() {
         totalSessions: number
         totalTime: number
         lastActivity: string
-        isCurrentlyActive: boolean
       }>()
-
-      const currentlyOnline = new Set<string>()
 
       sessions?.forEach(session => {
         const existing = userMap.get(session.discord_id) || {
           username: session.username,
           totalSessions: 0,
           totalTime: 0,
-          lastActivity: session.created_at,
-          isCurrentlyActive: false
-        }
-
-        // Check if user is currently active (session updated within last 10 minutes)
-        const lastUpdate = new Date(session.updated_at)
-        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000)
-        if (session.is_active && lastUpdate > tenMinutesAgo) {
-          currentlyOnline.add(session.discord_id)
+          lastActivity: session.created_at
         }
 
         userMap.set(session.discord_id, {
           username: session.username || existing.username,
           totalSessions: existing.totalSessions + 1,
           totalTime: existing.totalTime + (session.time_spent_seconds || 0),
-          lastActivity: session.created_at > existing.lastActivity ? session.created_at : existing.lastActivity,
-          isCurrentlyActive: currentlyOnline.has(session.discord_id)
+          lastActivity: session.created_at > existing.lastActivity ? session.created_at : existing.lastActivity
         })
       })
 
@@ -336,7 +334,6 @@ export function AnalyticsTab() {
         .sort((a, b) => b.total_time - a.total_time)
 
       setActiveUsers(userAnalyticsData)
-      setOnlineUsers(currentlyOnline)
     } catch (error) {
       console.error('Error loading user analytics:', error)
     } finally {
@@ -349,7 +346,8 @@ export function AnalyticsTab() {
     loadAnalytics()
     loadPageAnalytics()
     loadUserAnalytics()
-  }, [loadAnalytics, loadPageAnalytics, loadUserAnalytics])
+    refreshSessions() // Also refresh session data
+  }, [loadAnalytics, loadPageAnalytics, loadUserAnalytics, refreshSessions])
 
   // ====================================
   // EFFECTS
@@ -362,12 +360,12 @@ export function AnalyticsTab() {
     }
   }, [user, isAdmin, loadAllAnalytics])
 
-  // Auto-refresh every 30 seconds for live data
+  // Auto-refresh user analytics every 30 seconds for live data
   useEffect(() => {
     if (!user || !isAdmin) return
 
     const interval = setInterval(() => {
-      loadUserAnalytics() // Only refresh user analytics for live status
+      loadUserAnalytics() // Refresh user analytics for live status
     }, 30000) // 30 seconds
 
     return () => clearInterval(interval)
@@ -404,23 +402,33 @@ export function AnalyticsTab() {
           <p className="text-white/60 mt-1">Real-time insights and user activity tracking</p>
         </div>
         
-        <Button
-          onClick={loadAllAnalytics}
-          variant="outline"
-          disabled={Object.values(loadingState).some(Boolean)}
-        >
-          {Object.values(loadingState).some(Boolean) ? (
-            <>
-              <LoadingSpinner size="sm" className="mr-2" />
-              Refreshing...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh Data
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Online Users Indicator */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+            <Activity className="w-4 h-4 text-green-400" />
+            <span className="text-green-400 font-medium text-sm">
+              {onlineUsers.size} Online
+            </span>
+          </div>
+          
+          <Button
+            onClick={loadAllAnalytics}
+            variant="outline"
+            disabled={Object.values(loadingState).some(Boolean) || sessionLoading}
+          >
+            {Object.values(loadingState).some(Boolean) || sessionLoading ? (
+              <>
+                <LoadingSpinner size="sm" className="mr-2" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh Data
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Status Message */}
@@ -448,7 +456,7 @@ export function AnalyticsTab() {
           <p className="ml-4 text-white/60">Loading analytics...</p>
         </div>
       ) : analytics ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -508,12 +516,29 @@ export function AnalyticsTab() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white/60 text-sm font-medium">Revoked Users</p>
-                <p className="text-3xl font-bold text-red-400 mt-1">
-                  {formatNumber(analytics.revokedUsers)}
+                <p className="text-white/60 text-sm font-medium">Online Now</p>
+                <p className="text-3xl font-bold text-green-400 mt-1">
+                  {formatNumber(onlineUsers.size)}
                 </p>
               </div>
-              <XCircle className="w-8 h-8 text-red-400" />
+              <Activity className="w-8 h-8 text-green-400" />
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="bg-[#1a1a1a] rounded-xl border border-white/10 p-6"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white/60 text-sm font-medium">Active Sessions</p>
+                <p className="text-3xl font-bold text-[#00c6ff] mt-1">
+                  {formatNumber(activeSessions.length)}
+                </p>
+              </div>
+              <Globe className="w-8 h-8 text-[#00c6ff]" />
             </div>
           </motion.div>
         </div>
@@ -605,12 +630,20 @@ export function AnalyticsTab() {
             </div>
           </div>
 
-          {/* Active Users (Last 24 Hours) */}
+          {/* Active Users with Online Status (Last 24 Hours) */}
           <div className="bg-[#1a1a1a] rounded-xl border border-white/10 overflow-hidden">
             <div className="bg-purple-500/10 border-b border-purple-500/20 p-4">
-              <h3 className="text-xl font-semibold text-purple-400">
-                Active Users (Last 24 Hours)
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-purple-400">
+                  Active Users (Last 24 Hours)
+                </h3>
+                <div className="flex items-center gap-2 text-sm text-white/60">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Online</span>
+                  <div className="w-2 h-2 bg-gray-500 rounded-full ml-3"></div>
+                  <span>Offline</span>
+                </div>
+              </div>
             </div>
 
             <div className="overflow-x-auto max-h-96 overflow-y-auto">
@@ -657,11 +690,13 @@ export function AnalyticsTab() {
                             <div
                               className={`w-2 h-2 rounded-full ${
                                 onlineUsers.has(user.discord_id)
-                                  ? "bg-green-500"
+                                  ? "bg-green-500 animate-pulse"
                                   : "bg-gray-500"
                               }`}
                             ></div>
-                            <span className="text-sm text-white/80">
+                            <span className={`text-sm font-medium ${
+                              onlineUsers.has(user.discord_id) ? "text-green-400" : "text-white/80"
+                            }`}>
                               {onlineUsers.has(user.discord_id) ? "Online" : "Offline"}
                             </span>
                           </div>
@@ -684,12 +719,58 @@ export function AnalyticsTab() {
           </div>
         </div>
 
+        {/* Live Sessions Monitor */}
+        {activeSessions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+            className="mt-6 bg-[#1a1a1a] rounded-xl border border-white/10 p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <Activity className="w-6 h-6 text-green-400" />
+              <h3 className="text-xl font-semibold text-white">Live Sessions</h3>
+              <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
+                {activeSessions.length} Active
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeSessions.slice(0, 6).map((session) => (
+                <div key={session.id} className="bg-[#2a2a2a]/50 rounded-lg p-4 border border-white/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-white font-medium text-sm">
+                        {session.username || 'Unknown User'}
+                      </span>
+                    </div>
+                    <span className="text-green-400 text-xs font-medium">LIVE</span>
+                  </div>
+                  <p className="text-white/60 text-xs mb-1">
+                    Page: {session.page_path}
+                  </p>
+                  <p className="text-white/60 text-xs">
+                    Started: {timeAgo(session.enter_time || session.created_at)}
+                  </p>
+                </div>
+              ))}
+            </div>
+            
+            {activeSessions.length > 6 && (
+              <p className="text-center text-white/60 text-sm mt-4">
+                ... and {activeSessions.length - 6} more active sessions
+              </p>
+            )}
+          </motion.div>
+        )}
+
         {/* Recent Activity Section */}
         {analytics && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
+            transition={{ duration: 0.5, delay: 0.8 }}
             className="mt-6 bg-[#1a1a1a] rounded-xl border border-white/10 p-6"
           >
             <div className="flex items-center gap-3 mb-4">
@@ -702,9 +783,18 @@ export function AnalyticsTab() {
                 <p className="text-white/60">No recent activity</p>
               ) : (
                 analytics.recentSessions.map((session) => (
-                  <div key={session.id} className="flex items-center justify-between py-2 px-3 bg-[#2a2a2a]/50 rounded-lg">
-                    <div className="flex items-center">
-                      <Eye className="w-4 h-4 text-purple-400 mr-3" />
+                  <div key={session.id} className="flex items-center justify-between py-3 px-4 bg-[#2a2a2a]/50 rounded-lg hover:bg-[#2a2a2a]/70 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            onlineUsers.has(session.discord_id)
+                              ? "bg-green-500 animate-pulse"
+                              : "bg-gray-500"
+                          }`}
+                        ></div>
+                        <Eye className="w-4 h-4 text-purple-400" />
+                      </div>
                       <div>
                         <p className="text-white font-medium text-sm">
                           {session.username || 'Unknown User'}
@@ -714,9 +804,16 @@ export function AnalyticsTab() {
                         </p>
                       </div>
                     </div>
-                    <p className="text-white/60 text-xs">
-                      {timeAgo(session.created_at)}
-                    </p>
+                    <div className="text-right">
+                      <p className="text-white/60 text-xs">
+                        {timeAgo(session.created_at)}
+                      </p>
+                      {session.is_active && (
+                        <p className="text-green-400 text-xs font-medium">
+                          Active
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))
               )}

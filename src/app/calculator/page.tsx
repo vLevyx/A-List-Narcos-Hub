@@ -6,16 +6,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePageTracking } from '@/hooks/usePageTracking';
 import { CustomDropdown } from '@/components/ui/CustomDropdown';
 
-// Import from the new data file
+// Import from the updated data file
 import {
   CRAFTING_RECIPES,
   NON_CRAFTABLE_MATERIALS,
   getAllCategories,
   getItemsByCategory,
   getCraftingRecipe,
+  getItemTag,
+  getTagColors,
   type CraftingCategory,
   type CraftingRecipe,
-  type CraftingRequirement
+  type CraftingRequirement,
+  type ItemTag
 } from '@/lib/crafting-data';
 
 const PURPLE_PRIMARY = '#8b5cf6';
@@ -30,6 +33,58 @@ interface CalculationResults {
   totalXP: number;
   craftingLevel: number;
 }
+
+// Resource display component with tags
+const ResourceItem = ({ 
+  resource, 
+  amount, 
+  className = "" 
+}: { 
+  resource: string; 
+  amount: number; 
+  className?: string; 
+}) => {
+  const tag = getItemTag(resource);
+  const tagColors = getTagColors(tag);
+  
+  return (
+    <div className={`flex justify-between items-center p-3 rounded-lg ${tagColors.bg} border ${tagColors.border} ${className}`}>
+      <div className="flex items-center gap-2">
+        <span className="text-white/90 font-medium">{resource}</span>
+        <span className={`text-xs px-2 py-0.5 rounded font-medium ${tagColors.bg} ${tagColors.text} border ${tagColors.border}`}>
+          {tag}
+        </span>
+      </div>
+      <span className={`font-bold ${tagColors.text}`}>{amount.toLocaleString()}</span>
+    </div>
+  );
+};
+
+// Component breakdown resource item
+const ComponentResourceItem = ({ 
+  resource, 
+  amount 
+}: { 
+  resource: string; 
+  amount: number; 
+}) => {
+  const tag = getItemTag(resource);
+  const tagColors = getTagColors(tag);
+  
+  return (
+    <div className={`flex justify-between items-center p-2 rounded text-sm ${tagColors.bg} border ${tagColors.border}`}>
+      <div className="flex items-center gap-1">
+        <span className="text-white/80">{resource}</span>
+        <span className={`text-xs px-1 py-0.5 rounded ${tagColors.bg} ${tagColors.text}`}>
+          {tag}
+        </span>
+      </div>
+      <span className={`font-medium ${tagColors.text}`}>
+        {amount.toLocaleString()}
+      </span>
+    </div>
+  );
+};
 
 export default function NarcosCalculatorPage() {
   usePageTracking();
@@ -56,9 +111,10 @@ export default function NarcosCalculatorPage() {
     ...(selectedCategory 
       ? getItemsByCategory(selectedCategory as CraftingCategory).map(item => {
           const recipe = getCraftingRecipe(item);
+          const tag = getItemTag(item);
           return {
             value: item,
-            label: `${item}${recipe && recipe.craftingLevel > 0 ? ` (Level ${recipe.craftingLevel})` : ''}`
+            label: `${item}${recipe && recipe.craftingLevel > 0 ? ` (Level ${recipe.craftingLevel})` : ''} [${tag}]`
           };
         })
       : [])
@@ -311,13 +367,11 @@ export default function NarcosCalculatorPage() {
                     return recipe && recipe.requirements.length > 0 ? (
                       <div className="space-y-2 mb-6">
                         {recipe.requirements.map((req, index) => (
-                          <div 
+                          <ResourceItem
                             key={index}
-                            className="flex justify-between items-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/20"
-                          >
-                            <span className="text-white/90 font-medium">{req.item}</span>
-                            <span className="text-purple-300 font-bold">{(req.quantity * results.quantity).toLocaleString()}</span>
-                          </div>
+                            resource={req.item}
+                            amount={req.quantity * results.quantity}
+                          />
                         ))}
                       </div>
                     ) : (
@@ -336,29 +390,13 @@ export default function NarcosCalculatorPage() {
                     <div className="space-y-3 mb-6">
                       {Object.entries(results.baseResources)
                         .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([resource, amount]) => {
-                          const isNonCraftable = NON_CRAFTABLE_MATERIALS.has(resource);
-                          return (
-                            <div 
-                              key={resource} 
-                              className={`flex justify-between items-center p-3 rounded-lg ${
-                                isNonCraftable 
-                                  ? 'bg-amber-500/10 border border-amber-500/20' 
-                                  : 'bg-blue-500/10 border border-blue-500/20'
-                              }`}
-                            >
-                              <span className="text-white/90 font-medium">{resource}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-white font-bold">{(amount as number).toLocaleString()}</span>
-                                {isNonCraftable && (
-                                  <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-1 rounded">
-                                    Loot Only
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+                        .map(([resource, amount]) => (
+                          <ResourceItem
+                            key={resource}
+                            resource={resource}
+                            amount={amount as number}
+                          />
+                        ))}
                     </div>
                   )}
 
@@ -424,33 +462,13 @@ export default function NarcosCalculatorPage() {
                                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                     {Object.entries(componentResources)
                                       .sort(([a], [b]) => a.localeCompare(b))
-                                      .map(([resource, amount]) => {
-                                        const isNonCraftable = NON_CRAFTABLE_MATERIALS.has(resource);
-                                        return (
-                                          <div 
-                                            key={resource}
-                                            className={`flex justify-between items-center p-2 rounded text-sm ${
-                                              isNonCraftable 
-                                                ? 'bg-amber-500/10 border border-amber-500/20' 
-                                                : 'bg-blue-500/10 border border-blue-500/20'
-                                            }`}
-                                          >
-                                            <span className="text-white/80">{resource}</span>
-                                            <div className="flex items-center gap-1">
-                                              <span className={`font-medium ${
-                                                isNonCraftable ? 'text-amber-300' : 'text-blue-300'
-                                              }`}>
-                                                {(amount as number).toLocaleString()}
-                                              </span>
-                                              {isNonCraftable && (
-                                                <span className="text-xs bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded">
-                                                  Loot
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
+                                      .map(([resource, amount]) => (
+                                        <ComponentResourceItem
+                                          key={resource}
+                                          resource={resource}
+                                          amount={amount as number}
+                                        />
+                                      ))}
                                   </div>
                                 ) : (
                                   <div className="text-amber-300 italic text-sm bg-amber-500/10 border border-amber-500/20 rounded p-2">
@@ -463,6 +481,31 @@ export default function NarcosCalculatorPage() {
                         </div>
                       );
                     })()}
+                  </div>
+
+                  {/* Tag Legend */}
+                  <div className="mt-8">
+                    <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
+                      Material Type Legend
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
+                        <div className="text-emerald-300 font-bold mb-1">Gatherable</div>
+                        <div className="text-xs text-gray-400">Materials you can mine/gather from the world</div>
+                      </div>
+                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
+                        <div className="text-blue-300 font-bold mb-1">Processed</div>
+                        <div className="text-xs text-gray-400">Materials processed from gathered resources</div>
+                      </div>
+                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-center">
+                        <div className="text-amber-300 font-bold mb-1">Lootable</div>
+                        <div className="text-xs text-gray-400">Items from Cartel Shipments or Chemical Trucks</div>
+                      </div>
+                      <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 text-center">
+                        <div className="text-purple-300 font-bold mb-1">Craftable</div>
+                        <div className="text-xs text-gray-400">Items that must be crafted at workbenches</div>
+                      </div>
+                    </div>
                   </div>
 
                 </>

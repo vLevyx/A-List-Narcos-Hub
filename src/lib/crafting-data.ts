@@ -24,15 +24,63 @@ export type CraftingCategory =
   | "Backpack"
   | "Materials";
 
-// Non-craftable materials (can only be found/looted)
+export type ItemTag = "Gatherable" | "Processed" | "Lootable" | "Craftable";
+
+// Item categorization with tags
+export const ITEM_TAGS: Record<string, ItemTag> = {
+  // Gatherable items
+  "Coal": "Gatherable",
+  "Sand": "Gatherable", 
+  "Unprocessed Copper": "Gatherable",
+  "Unprocessed Iron": "Gatherable",
+  "Cotton": "Gatherable",
+  "Unprocessed Diamonds": "Gatherable",
+  "Saltpeter": "Gatherable",
+
+  // Processed items
+  "Glass": "Processed",
+  "Iron bar": "Processed",
+  "Copper bar": "Processed", 
+  "Cloth": "Processed",
+  "Processed Diamonds": "Processed",
+  "Diamond": "Processed",
+
+  // Lootable items
+  "Kevlar Weave": "Lootable",
+  "Silver Plating Kit": "Lootable",
+  "Gold Plating Kit": "Lootable",
+  "Blue Dye": "Lootable",
+  "Green Dye": "Lootable",
+  "Pink Dye": "Lootable",
+  "Red Dye": "Lootable",
+  "Tan Dye": "Lootable",
+  "Yellow Dye": "Lootable",
+  "White Dye": "Lootable",
+  "Cocaine": "Lootable",
+  "Fentanyl": "Lootable"
+};
+
+// Non-craftable materials (can only be found/looted/gathered/processed)
 export const NON_CRAFTABLE_MATERIALS = new Set([
-  "Kevlar Weave",
+  // Gatherable
+  "Coal",
+  "Sand", 
+  "Unprocessed Copper",
+  "Unprocessed Iron",
+  "Cotton",
+  "Unprocessed Diamonds",
+  "Saltpeter",
+  
+  // Processed
+  "Glass",
   "Iron bar",
   "Copper bar", 
-  "Coal",
-  "Diamond",
-  "Saltpeter",
   "Cloth",
+  "Processed Diamonds",
+  "Diamond",
+  
+  // Lootable
+  "Kevlar Weave",
   "Silver Plating Kit",
   "Gold Plating Kit",
   "Blue Dye",
@@ -41,8 +89,46 @@ export const NON_CRAFTABLE_MATERIALS = new Set([
   "Red Dye",
   "Tan Dye",
   "Yellow Dye",
-  "White Dye"
+  "White Dye",
+  "Cocaine",
+  "Fentanyl"
 ]);
+
+// Get item tag
+export function getItemTag(itemName: string): ItemTag {
+  return ITEM_TAGS[itemName] || "Craftable";
+}
+
+// Get tag color classes
+export function getTagColors(tag: ItemTag): { bg: string; text: string; border: string } {
+  switch (tag) {
+    case "Gatherable":
+      return { 
+        bg: "bg-emerald-500/20", 
+        text: "text-emerald-300", 
+        border: "border-emerald-500/30" 
+      };
+    case "Processed":
+      return { 
+        bg: "bg-blue-500/20", 
+        text: "text-blue-300", 
+        border: "border-blue-500/30" 
+      };
+    case "Lootable":
+      return { 
+        bg: "bg-amber-500/20", 
+        text: "text-amber-300", 
+        border: "border-amber-500/30" 
+      };
+    case "Craftable":
+    default:
+      return { 
+        bg: "bg-purple-500/20", 
+        text: "text-purple-300", 
+        border: "border-purple-500/30" 
+      };
+  }
+}
 
 // Centralized crafting database
 export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
@@ -151,6 +237,7 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
       { item: "Steel receiver", quantity: 4 },
       { item: "Hardened firing pin", quantity: 1 },
       { item: "Grip", quantity: 2 },
+      { item: "Slide", quantity: 2 },
       { item: "Stock", quantity: 3 },
       { item: "Trigger", quantity: 1 }
     ],
@@ -203,7 +290,7 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
       { item: "Steel receiver", quantity: 3 },
       { item: "Firing pin", quantity: 1 },
       { item: "Grip", quantity: 1 },
-      { item: "Slide", quantity: 1 },
+      { item: "Slide", quantity: 2 },
       { item: "Stock", quantity: 1 },
       { item: "Trigger", quantity: 1 }
     ],

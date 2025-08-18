@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { 
@@ -17,7 +17,10 @@ import {
   UserCheck,
   UserX,
   Settings,
-  UserPlus
+  UserPlus,
+  ChevronLeft,
+  ChevronRight,
+  Activity
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { usePageTracking } from '@/hooks/usePageTracking'
@@ -27,6 +30,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { Button } from '@/components/ui/Button'
 import { ReferralsSection } from '@/components/admin/ReferralsSection'
 import { AnalyticsTab } from '@/components/admin/AnalyticsTab'
+import { useRealtimeSessionMonitoring } from '@/hooks/useRealtimeSessionMonitoring'
 
 // ====================================
 // INTERFACES
@@ -72,6 +76,9 @@ export default function AdminDashboard() {
   const { user, loading: authLoading, isAdmin } = useAuth()
   const supabase = createClient()
 
+  // Real-time session monitoring
+  const { onlineUsers } = useRealtimeSessionMonitoring()
+
   // ====================================
   // STATE MANAGEMENT
   // ====================================
@@ -101,13 +108,39 @@ export default function AdminDashboard() {
     message: string
   }>({ type: null, message: '' })
 
+  // Cache and real-time
+  const [dataLoadedOnce, setDataLoadedOnce] = useState(false)
+  const [lastManualRefresh, setLastManualRefresh] = useState(0)
+  
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const tabScrollRef = useRef<HTMLDivElement>(null)
+
+  // ====================================
+  // RESPONSIVE TAB NAVIGATION
+  // ====================================
+
+  const tabs = useMemo(() => [
+    { key: 'users', label: 'Users', icon: Users },
+    { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { key: 'logs', label: 'Logs', icon: FileText },
+    { key: 'referrals', label: 'Referrals', icon: UserPlus }
+  ], [])
+
+  const scrollTabs = (direction: 'left' | 'right') => {
+    if (tabScrollRef.current) {
+      const scrollAmount = 200
+      tabScrollRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      })
+    }
+  }
 
   // ====================================
   // ACCESS CONTROL
   // ====================================
 
-  // Check admin access
+  // Check admin access - optimized to prevent unnecessary re-renders
   useEffect(() => {
     if (authLoading) return
     
@@ -128,13 +161,19 @@ export default function AdminDashboard() {
     page: number = 1, 
     limit: number = 20, 
     search: string = '', 
-    statusFilter: UserStatusFilter = 'all'
+    statusFilter: UserStatusFilter = 'all',
+    forceRefresh: boolean = false
   ) => {
     if (!user || !isAdmin) {
       setStatusMessage({
         type: 'error',
         message: 'Admin access required to view users'
       })
+      return
+    }
+
+    // Skip if data is already loaded and this isn't a forced refresh
+    if (dataLoadedOnce && !forceRefresh && !search && statusFilter === 'all' && page === 1) {
       return
     }
 
@@ -210,11 +249,14 @@ export default function AdminDashboard() {
       })
 
       setUsers(usersWithAccess)
+      setDataLoadedOnce(true)
       
-      setStatusMessage({
-        type: 'success',
-        message: `Loaded ${usersWithAccess.length} users successfully`
-      })
+      if (forceRefresh) {
+        setStatusMessage({
+          type: 'success',
+          message: `Refreshed ${usersWithAccess.length} users successfully`
+        })
+      }
     } catch (error) {
       console.error('Error loading users:', error)
       setStatusMessage({
@@ -224,15 +266,20 @@ export default function AdminDashboard() {
     } finally {
       setLoadingState(prev => ({ ...prev, users: false }))
     }
-  }, [supabase, user, isAdmin])
+  }, [supabase, user, isAdmin, dataLoadedOnce])
 
   // Load logs with proper admin verification
-  const loadLogs = useCallback(async (page: number = 1, limit: number = 50) => {
+  const loadLogs = useCallback(async (page: number = 1, limit: number = 50, forceRefresh: boolean = false) => {
     if (!user || !isAdmin) {
       setStatusMessage({
         type: 'error',
         message: 'Admin access required to view logs'
       })
+      return
+    }
+
+    // Skip if data is already loaded and this isn't a forced refresh
+    if (dataLoadedOnce && !forceRefresh) {
       return
     }
 
@@ -259,10 +306,12 @@ export default function AdminDashboard() {
 
       setLogs(data || [])
       
-      setStatusMessage({
-        type: 'success',
-        message: `Loaded ${(data || []).length} log entries`
-      })
+      if (forceRefresh) {
+        setStatusMessage({
+          type: 'success',
+          message: `Refreshed ${(data || []).length} log entries`
+        })
+      }
     } catch (error) {
       console.error('Error loading logs:', error)
       setStatusMessage({
@@ -272,7 +321,64 @@ export default function AdminDashboard() {
     } finally {
       setLoadingState(prev => ({ ...prev, logs: false }))
     }
-  }, [supabase, user, isAdmin])
+  }, [supabase, user, isAdmin, dataLoadedOnce])
+
+  // Manual refresh function
+  const handleManualRefresh = useCallback(() => {
+    const now = Date.now()
+    setLastManualRefresh(now)
+    setDataLoadedOnce(false) // Reset cache
+    loadUsers(userPage, userLimit, userSearch, userStatusFilter, true)
+    loadLogs(1, 50, true)
+  }, [loadUsers, loadLogs, userPage, userLimit, userSearch, userStatusFilter])
+
+  // ====================================
+  // REAL-TIME SUBSCRIPTIONS
+  // ====================================
+
+  // Set up real-time subscriptions for users table
+  useEffect(() => {
+    if (!isAdmin || !dataLoadedOnce) return
+
+    const usersSubscription = supabase
+      .channel('users_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users'
+        },
+        (payload) => {
+          console.log('Users table changed:', payload)
+          // Reload users data when changes occur
+          loadUsers(userPage, userLimit, userSearch, userStatusFilter, true)
+        }
+      )
+      .subscribe()
+
+    const logsSubscription = supabase
+      .channel('logs_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'admin_logs'
+        },
+        (payload) => {
+          console.log('Admin logs changed:', payload)
+          // Reload logs when changes occur
+          loadLogs(1, 50, true)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      usersSubscription.unsubscribe()
+      logsSubscription.unsubscribe()
+    }
+  }, [isAdmin, dataLoadedOnce, loadUsers, loadLogs, userPage, userLimit, userSearch, userStatusFilter])
 
   // ====================================
   // SEARCH AND FILTER HANDLERS
@@ -288,7 +394,7 @@ export default function AdminDashboard() {
     
     searchTimeoutRef.current = setTimeout(() => {
       setUserPage(1)
-      loadUsers(1, userLimit, search, userStatusFilter)
+      loadUsers(1, userLimit, search, userStatusFilter, true)
     }, 500)
   }, [loadUsers, userLimit, userStatusFilter])
 
@@ -338,9 +444,8 @@ export default function AdminDashboard() {
         message: `Successfully performed action: ${description}`
       })
 
-      // Reload data
-      loadUsers(userPage, userLimit, userSearch, userStatusFilter)
-      loadLogs()
+      // Real-time subscription will handle the data refresh automatically
+      // No need to manually reload here
     } catch (error) {
       console.error('Error performing user action:', error)
       setStatusMessage({
@@ -361,21 +466,21 @@ export default function AdminDashboard() {
   // EFFECTS
   // ====================================
 
-  // Initial load
+  // Initial load - only runs once when admin access is confirmed
   useEffect(() => {
-    if (loading || !isAdmin) return
+    if (loading || !isAdmin || dataLoadedOnce) return
     
-    console.log('Loading initial data...') // Debug log
-    loadUsers()
-    loadLogs()
-  }, [loading, isAdmin, loadUsers, loadLogs])
+    console.log('Loading initial data...')
+    loadUsers(1, userLimit, '', 'all', true)
+    loadLogs(1, 50, true)
+  }, [loading, isAdmin, dataLoadedOnce, loadUsers, loadLogs, userLimit])
 
-  // Filter change handler
+  // Filter change handler - only reload when filters actually change
   useEffect(() => {
-    if (loading) return
+    if (loading || !dataLoadedOnce) return
     setUserPage(1)
-    loadUsers(1, userLimit, userSearch, userStatusFilter)
-  }, [userStatusFilter, loading, loadUsers, userLimit, userSearch])
+    loadUsers(1, userLimit, userSearch, userStatusFilter, true)
+  }, [userStatusFilter]) // Removed userSearch from deps since it's handled by debounce
 
   // Clear status message after some time
   useEffect(() => {
@@ -410,32 +515,38 @@ export default function AdminDashboard() {
   // ====================================
 
   return (
-    <div className="min-h-screen py-8 px-4">
+    <div className="min-h-screen py-4 sm:py-8 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8"
+          className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-8"
         >
           <div>
-            <h1 className="text-4xl font-bold mb-2">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
               <span className="gradient-text">Admin Dashboard</span>
             </h1>
-            <p className="text-text-secondary">
+            <p className="text-text-secondary text-sm sm:text-base">
               Manage users, view analytics, track referrals, and monitor system activity
             </p>
           </div>
           
-          <div className="mt-4 md:mt-0">
+          <div className="mt-4 md:mt-0 w-full md:w-auto flex items-center gap-3">
+            {/* Online Users Indicator */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+              <Activity className="w-4 h-4 text-green-400" />
+              <span className="text-green-400 font-medium text-sm">
+                {onlineUsers.size} Online
+              </span>
+            </div>
+            
             <Button
-              onClick={() => {
-                loadUsers(userPage, userLimit, userSearch, userStatusFilter)
-                loadLogs()
-              }}
+              onClick={handleManualRefresh}
               variant="outline"
               disabled={loadingState.users || loadingState.logs}
+              className="w-full md:w-auto"
             >
               {loadingState.users || loadingState.logs ? (
                 <>
@@ -458,7 +569,7 @@ export default function AdminDashboard() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className={`mb-6 p-4 rounded-lg ${
+            className={`mb-4 sm:mb-6 p-4 rounded-lg ${
               statusMessage.type === 'success'
                 ? 'bg-green-500/10 border border-green-500/30 text-green-400'
                 : statusMessage.type === 'error'
@@ -469,36 +580,76 @@ export default function AdminDashboard() {
             }`}
           >
             <div className="flex items-center">
-              {statusMessage.type === 'success' && <CheckCircle className="w-5 h-5 mr-2" />}
-              {statusMessage.type === 'error' && <XCircle className="w-5 h-5 mr-2" />}
-              {statusMessage.type === 'warning' && <AlertTriangle className="w-5 h-5 mr-2" />}
-              {statusMessage.type === 'info' && <Settings className="w-5 h-5 mr-2" />}
-              <p className="font-medium">{statusMessage.message}</p>
+              {statusMessage.type === 'success' && <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />}
+              {statusMessage.type === 'error' && <XCircle className="w-5 h-5 mr-2 flex-shrink-0" />}
+              {statusMessage.type === 'warning' && <AlertTriangle className="w-5 h-5 mr-2 flex-shrink-0" />}
+              {statusMessage.type === 'info' && <Settings className="w-5 h-5 mr-2 flex-shrink-0" />}
+              <p className="font-medium text-sm sm:text-base">{statusMessage.message}</p>
             </div>
           </motion.div>
         )}
 
         {/* Navigation Tabs */}
-        <div className="flex space-x-1 mb-8 bg-background-secondary/30 p-1 rounded-xl">
-          {[
-            { key: 'users', label: 'Users', icon: Users },
-            { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-            { key: 'logs', label: 'Logs', icon: FileText },
-            { key: 'referrals', label: 'Referrals', icon: UserPlus }
-          ].map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key as TabType)}
-              className={`flex items-center px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                activeTab === key
-                  ? 'bg-accent-primary text-black shadow-lg shadow-accent-primary/20'
-                  : 'text-text-secondary hover:text-white hover:bg-background-secondary/50'
-              }`}
-            >
-              <Icon className="w-5 h-5 mr-2" />
-              {label}
-            </button>
-          ))}
+        <div className="mb-6 sm:mb-8">
+          {/* Desktop Tabs */}
+          <div className="hidden sm:flex space-x-1 bg-background-secondary/30 p-1 rounded-xl">
+            {tabs.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key as TabType)}
+                className={`flex items-center px-6 py-3 rounded-lg font-medium transition-all duration-200 flex-1 ${
+                  activeTab === key
+                    ? 'bg-accent-primary text-black shadow-lg shadow-accent-primary/20'
+                    : 'text-text-secondary hover:text-white hover:bg-background-secondary/50'
+                }`}
+              >
+                <Icon className="w-5 h-5 mr-2" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Mobile Tabs with Scroll */}
+          <div className="sm:hidden bg-background-secondary/30 p-1 rounded-xl relative">
+            <div className="flex items-center">
+              <button
+                onClick={() => scrollTabs('left')}
+                className="absolute left-2 z-10 p-2 bg-background-primary/80 rounded-lg shadow-lg backdrop-blur-sm"
+                aria-label="Scroll tabs left"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              
+              <div 
+                ref={tabScrollRef}
+                className="flex space-x-2 overflow-x-auto scrollbar-hide px-12 py-1"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {tabs.map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key as TabType)}
+                    className={`flex items-center px-4 py-2.5 rounded-lg font-medium transition-all duration-200 whitespace-nowrap ${
+                      activeTab === key
+                        ? 'bg-accent-primary text-black shadow-lg shadow-accent-primary/20'
+                        : 'text-text-secondary hover:text-white bg-background-secondary/50'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 mr-2" />
+                    <span className="text-sm">{label}</span>
+                  </button>
+                ))}
+              </div>
+              
+              <button
+                onClick={() => scrollTabs('right')}
+                className="absolute right-2 z-10 p-2 bg-background-primary/80 rounded-lg shadow-lg backdrop-blur-sm"
+                aria-label="Scroll tabs right"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -510,19 +661,19 @@ export default function AdminDashboard() {
         >
           {/* Users Tab */}
           {activeTab === 'users' && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Users Header */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h2 className="text-2xl font-semibold text-white">User Management</h2>
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <h2 className="text-xl sm:text-2xl font-semibold text-white">User Management</h2>
                 
-                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                   <div className="relative">
                     <input
                       type="text"
                       value={userSearch}
                       onChange={(e) => handleUserSearch(e.target.value)}
                       placeholder="Search by username or Discord ID"
-                      className="w-full pl-10 pr-4 py-2.5 bg-background-primary border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-accent-primary"
+                      className="w-full sm:w-64 xl:w-80 pl-10 pr-4 py-2.5 bg-background-primary border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-accent-primary text-sm"
                     />
                     <Search className="absolute left-3 top-3 w-4 h-4 text-white/40" />
                   </div>
@@ -530,7 +681,7 @@ export default function AdminDashboard() {
                   <select
                     value={userStatusFilter}
                     onChange={(e) => setUserStatusFilter(e.target.value as UserStatusFilter)}
-                    className="px-4 py-2.5 bg-background-primary border border-white/10 rounded-lg text-white focus:outline-none focus:border-accent-primary"
+                    className="px-4 py-2.5 bg-background-primary border border-white/10 rounded-lg text-white focus:outline-none focus:border-accent-primary text-sm"
                   >
                     <option value="all">All Users</option>
                     <option value="access">With Access</option>
@@ -544,7 +695,8 @@ export default function AdminDashboard() {
               {/* Users Table */}
               <div className="bg-background-secondary/50 rounded-xl border border-white/10 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  {/* Desktop Table */}
+                  <table className="w-full hidden sm:table">
                     <thead className="bg-background-primary/50">
                       <tr>
                         <th className="p-4 text-left text-accent-primary font-medium">User</th>
@@ -574,6 +726,15 @@ export default function AdminDashboard() {
                           <tr key={user.id} className="hover:bg-background-primary/30 transition-colors">
                             <td className="p-4">
                               <div className="flex items-center">
+                                {/* Online Status Indicator */}
+                                <div
+                                  className={`w-2 h-2 rounded-full mr-3 ${
+                                    onlineUsers.has(user.discord_id)
+                                      ? "bg-green-500 animate-pulse"
+                                      : "bg-gray-500"
+                                  }`}
+                                  title={onlineUsers.has(user.discord_id) ? "Online" : "Offline"}
+                                ></div>
                                 <div className="w-10 h-10 bg-accent-primary/20 rounded-full flex items-center justify-center mr-3">
                                   <span className="text-accent-primary font-semibold">
                                     {(user.username || user.discord_id).charAt(0).toUpperCase()}
@@ -683,8 +844,217 @@ export default function AdminDashboard() {
                       )}
                     </tbody>
                   </table>
+
+                  {/* Mobile Card Layout */}
+                  <div className="sm:hidden">
+                    {loadingState.users ? (
+                      <div className="p-8 text-center">
+                        <LoadingSpinner size="md" className="mx-auto" />
+                        <p className="mt-2 text-white/60 text-sm">Loading users...</p>
+                      </div>
+                    ) : filteredUsers.length === 0 ? (
+                      <div className="p-8 text-center text-white/60 text-sm">
+                        No users found matching your criteria.
+                      </div>
+                    ) : (
+                      <div className="space-y-4 p-4">
+                        {filteredUsers.map((user) => (
+                          <div key={user.id} className="bg-background-primary/30 rounded-lg p-4 border border-white/5">
+                            {/* User Info */}
+                            <div className="flex items-center mb-3">
+                              {/* Online Status Indicator */}
+                              <div
+                                className={`w-2 h-2 rounded-full mr-3 ${
+                                  onlineUsers.has(user.discord_id)
+                                    ? "bg-green-500 animate-pulse"
+                                    : "bg-gray-500"
+                                }`}
+                                title={onlineUsers.has(user.discord_id) ? "Online" : "Offline"}
+                              ></div>
+                              <div className="w-10 h-10 bg-accent-primary/20 rounded-full flex items-center justify-center mr-3">
+                                <span className="text-accent-primary font-semibold text-sm">
+                                  {(user.username || user.discord_id).charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-white text-sm truncate">
+                                    {user.username || 'Unknown User'}
+                                  </p>
+                                  {onlineUsers.has(user.discord_id) && (
+                                    <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
+                                      Online
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-white/60 truncate">
+                                  ID: {user.discord_id}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Status Grid */}
+                            <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
+                              <div>
+                                <span className="text-white/60">Status:</span>
+                                <div className="mt-1">
+                                  {user.revoked ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400">
+                                      <XCircle className="w-3 h-3 mr-1" />
+                                      Revoked
+                                    </span>
+                                  ) : user.hasAccess ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      Access
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                                      <Clock className="w-3 h-3 mr-1" />
+                                      No Access
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-white/60">Trial:</span>
+                                <div className="mt-1">
+                                  {user.hub_trial ? (
+                                    user.isTrialActive ? (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
+                                        <Shield className="w-3 h-3 mr-1" />
+                                        Active
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
+                                        <Clock className="w-3 h-3 mr-1" />
+                                        Expired
+                                      </span>
+                                    )
+                                  ) : (
+                                    <span className="text-white/40 text-xs">No Trial</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-white/60">Last Login:</span>
+                                <div className="mt-1 text-white/80">
+                                  {timeAgo(user.last_login)}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-white/60">Login Count:</span>
+                                <div className="mt-1 text-white/80">
+                                  {user.login_count || 0}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-wrap gap-2">
+                              {!user.revoked && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => performUserAction(user.discord_id, 'trial_7')}
+                                    disabled={loadingState.action}
+                                    className="text-xs px-3 py-1 h-auto"
+                                  >
+                                    7d Trial
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => performUserAction(user.discord_id, 'trial_30')}
+                                    disabled={loadingState.action}
+                                    className="text-xs px-3 py-1 h-auto"
+                                  >
+                                    30d Trial
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => performUserAction(user.discord_id, 'whitelist')}
+                                    disabled={loadingState.action}
+                                    className="text-xs text-green-400 border-green-400/30 hover:bg-green-400/10 px-3 py-1 h-auto"
+                                  >
+                                    <UserCheck className="w-3 h-3 mr-1" />
+                                    Grant Access
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => performUserAction(user.discord_id, user.revoked ? 'whitelist' : 'revoke')}
+                                disabled={loadingState.action}
+                                className={`text-xs px-3 py-1 h-auto ${
+                                  user.revoked 
+                                    ? 'text-green-400 border-green-400/30 hover:bg-green-400/10'
+                                    : 'text-red-400 border-red-400/30 hover:bg-red-400/10'
+                                }`}
+                              >
+                                {user.revoked ? (
+                                  <>
+                                    <UserCheck className="w-3 h-3 mr-1" />
+                                    Restore
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserX className="w-3 h-3 mr-1" />
+                                    Revoke
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Pagination */}
+              {filteredUsers.length > 0 && (
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6">
+                  <p className="text-sm text-white/60">
+                    Showing {filteredUsers.length} users
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (userPage > 1) {
+                          setUserPage(userPage - 1)
+                          loadUsers(userPage - 1, userLimit, userSearch, userStatusFilter, true)
+                        }
+                      }}
+                      disabled={userPage === 1 || loadingState.users}
+                      className="text-xs"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-white/80 px-3">
+                      Page {userPage}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setUserPage(userPage + 1)
+                        loadUsers(userPage + 1, userLimit, userSearch, userStatusFilter, true)
+                      }}
+                      disabled={filteredUsers.length < userLimit || loadingState.users}
+                      className="text-xs"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -693,18 +1063,19 @@ export default function AdminDashboard() {
 
           {/* Logs Tab */}
           {activeTab === 'logs' && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-semibold text-white">Admin Logs</h2>
+            <div className="space-y-4 sm:space-y-6">
+              <h2 className="text-xl sm:text-2xl font-semibold text-white">Admin Logs</h2>
               
               {loadingState.logs ? (
                 <div className="flex items-center justify-center py-12">
                   <LoadingSpinner size="lg" />
-                  <p className="ml-4 text-white/60">Loading logs...</p>
+                  <p className="ml-4 text-white/60 text-sm">Loading logs...</p>
                 </div>
               ) : (
                 <div className="bg-background-secondary/50 rounded-xl border border-white/10 overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    {/* Desktop Table */}
+                    <table className="w-full hidden sm:table">
                       <thead className="bg-background-primary/50">
                         <tr>
                           <th className="p-4 text-left text-accent-primary font-medium">Time</th>
@@ -746,6 +1117,48 @@ export default function AdminDashboard() {
                         )}
                       </tbody>
                     </table>
+
+                    {/* Mobile Card Layout */}
+                    <div className="sm:hidden">
+                      {logs.length === 0 ? (
+                        <div className="p-8 text-center text-white/60 text-sm">
+                          No admin logs found
+                        </div>
+                      ) : (
+                        <div className="space-y-4 p-4">
+                          {logs.map((log) => (
+                            <div key={log.id} className="bg-background-primary/30 rounded-lg p-4 border border-white/5">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-accent-primary/20 text-accent-primary">
+                                      {log.action}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-white font-medium">
+                                    {log.admin_name || 'Unknown Admin'}
+                                  </p>
+                                </div>
+                                <div className="text-xs text-white/60 text-right">
+                                  {timeAgo(log.created_at)}
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2 text-xs">
+                                <div>
+                                  <span className="text-white/60">Target:</span>
+                                  <span className="ml-2 text-white/80">{log.target_discord_id || 'N/A'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-white/60">Description:</span>
+                                  <span className="ml-2 text-white/80">{log.description || 'No description'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -756,6 +1169,16 @@ export default function AdminDashboard() {
           {activeTab === 'referrals' && <ReferralsSection />}
         </motion.div>
       </div>
+
+      {/* Custom styles for hiding scrollbar */}
+      <style jsx>{`
+        .scrollbar-hide {
+          -webkit-overflow-scrolling: touch;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   )
 }

@@ -295,16 +295,18 @@ export default function SecurityPage() {
         </div>
 
         {/* Security Reporting */}
-        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 mb-16">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-white mb-4 flex items-center justify-center gap-3">
-              <AlertTriangle className="w-6 h-6 text-orange-400" />
-              Security Issue Reporting
-            </h2>
-            <p className="text-text-secondary max-w-2xl mx-auto">
-              Found a security vulnerability? We appreciate responsible disclosure and will work with you to resolve any issues quickly and safely.
-            </p>
-          </div>
+<div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 mb-16">
+  <div className="text-center mb-8">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center sm:gap-3 items-center mb-4">
+      <AlertTriangle className="w-6 h-6 text-orange-400 mb-2 sm:mb-0" />
+      <h2 className="text-2xl font-bold text-white">
+        Security Issue Reporting
+      </h2>
+    </div>
+    <p className="text-text-secondary max-w-2xl mx-auto">
+      Found a security vulnerability? We appreciate responsible disclosure and will work with you to resolve any issues quickly and safely.
+    </p>
+  </div>
           
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {reportingProcess.map((step, index) => (

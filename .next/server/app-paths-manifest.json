@@ -1,3 +1,8 @@
 {
-  "/docs/page": "app/docs/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/security/page": "app/security/page.js",
+  "/page": "app/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/starter-guide/page": "app/starter-guide/page.js",
+  "/calculator/page": "app/calculator/page.js"
 }
