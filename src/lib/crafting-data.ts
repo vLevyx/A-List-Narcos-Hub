@@ -130,6 +130,83 @@ export function getTagColors(tag: ItemTag): { bg: string; text: string; border: 
   }
 }
 
+// ===== THREE-STAGE CALCULATION FUNCTIONS =====
+
+/**
+ * Calculate Stage 2: Sub-Direct Requirements
+ * Returns all intermediate craftable items needed (not base materials, not direct requirements)
+ */
+export function calculateSubDirectRequirements(itemName: string, quantity: number): { [key: string]: number } {
+  const subDirectReqs: { [key: string]: number } = {};
+  const recipe = getCraftingRecipe(itemName);
+  
+  if (!recipe || recipe.requirements.length === 0) {
+    return subDirectReqs;
+  }
+  
+  // Get the direct requirements (Stage 3) to exclude them from Stage 2
+  const directRequirementNames = new Set(recipe.requirements.map(req => req.item));
+  
+  // For each direct requirement, find its sub-components
+  for (const requirement of recipe.requirements) {
+    const reqRecipe = getCraftingRecipe(requirement.item);
+    
+    // If this requirement has sub-components, analyze them
+    if (reqRecipe && reqRecipe.requirements.length > 0 && !NON_CRAFTABLE_MATERIALS.has(requirement.item)) {
+      
+      // Process the sub-components of this direct requirement
+      for (const subReq of reqRecipe.requirements) {
+        const subRecipe = getCraftingRecipe(subReq.item);
+        
+        // If it's craftable and not a base material, it goes in Stage 2
+        if (subRecipe && subRecipe.requirements.length > 0 && !NON_CRAFTABLE_MATERIALS.has(subReq.item)) {
+          const totalNeeded = subReq.quantity * requirement.quantity * quantity;
+          subDirectReqs[subReq.item] = (subDirectReqs[subReq.item] || 0) + totalNeeded;
+          
+          // Recursively add deeper sub-components
+          const deeperReqs = calculateSubDirectRequirements(subReq.item, totalNeeded);
+          for (const [deepItem, deepQty] of Object.entries(deeperReqs)) {
+            // Only add if it's not already a direct requirement
+            if (!directRequirementNames.has(deepItem)) {
+              subDirectReqs[deepItem] = (subDirectReqs[deepItem] || 0) + deepQty;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return subDirectReqs;
+}
+
+/**
+ * Calculate Stage 1: Base Materials Needed
+ * Returns only the raw, non-craftable materials
+ */
+export function calculateBaseMaterials(itemName: string, quantity: number): { [key: string]: number } {
+  const resources: { [key: string]: number } = {};
+  const recipe = getCraftingRecipe(itemName);
+  
+  // If item has no recipe or is non-craftable, treat it as a base resource
+  if (!recipe || recipe.requirements.length === 0 || NON_CRAFTABLE_MATERIALS.has(itemName)) {
+    resources[itemName] = quantity;
+    return resources;
+  }
+  
+  // Process each requirement recursively
+  for (const requirement of recipe.requirements) {
+    const totalNeeded = requirement.quantity * quantity;
+    const subResources = calculateBaseMaterials(requirement.item, totalNeeded);
+    
+    // Combine resources, handling duplicates
+    for (const [subResourceName, subResourceQty] of Object.entries(subResources)) {
+      resources[subResourceName] = (resources[subResourceName] || 0) + subResourceQty;
+    }
+  }
+  
+  return resources;
+}
+
 // Centralized crafting database
 export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
   // ===== WEAPON PARTS =====

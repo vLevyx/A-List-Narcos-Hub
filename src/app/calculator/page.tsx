@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ChevronDown, Package, Clock, Zap, AlertCircle, RotateCcw } from 'lucide-react';
+import { ChevronDown, Package, Clock, Zap, AlertCircle, RotateCcw, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePageTracking } from '@/hooks/usePageTracking';
 import { CustomDropdown } from '@/components/ui/CustomDropdown';
@@ -15,6 +15,8 @@ import {
   getCraftingRecipe,
   getItemTag,
   getTagColors,
+  calculateBaseMaterials,
+  calculateSubDirectRequirements,
   type CraftingCategory,
   type CraftingRecipe,
   type CraftingRequirement,
@@ -28,6 +30,8 @@ const PURPLE_PRIMARY = '#8b5cf6';
 interface CalculationResults {
   item: string;
   quantity: number;
+  directRequirements: CraftingRequirement[];
+  subDirectRequirements: { [key: string]: number };
   baseResources: { [key: string]: number };
   totalTime: number;
   totalXP: number;
@@ -38,11 +42,15 @@ interface CalculationResults {
 const ResourceItem = ({ 
   resource, 
   amount, 
-  className = "" 
+  className = "",
+  showStage = false,
+  stage = ""
 }: { 
   resource: string; 
   amount: number; 
-  className?: string; 
+  className?: string;
+  showStage?: boolean;
+  stage?: string;
 }) => {
   const tag = getItemTag(resource);
   const tagColors = getTagColors(tag);
@@ -54,6 +62,11 @@ const ResourceItem = ({
         <span className={`text-xs px-2 py-0.5 rounded font-medium ${tagColors.bg} ${tagColors.text} border ${tagColors.border}`}>
           {tag}
         </span>
+        {showStage && (
+          <span className="text-xs px-2 py-0.5 rounded font-medium bg-gray-600 text-gray-200">
+            {stage}
+          </span>
+        )}
       </div>
       <span className={`font-bold ${tagColors.text}`}>{amount.toLocaleString()}</span>
     </div>
@@ -121,34 +134,6 @@ export default function NarcosCalculatorPage() {
   ];
 
   /**
-   * Recursively collect all base materials needed for crafting an item
-   * This handles nested requirements like Gold AK74 → AK74 → Steel barrel, etc.
-   */
-  const collectBaseResources = (itemName: string, quantity: number): { [key: string]: number } => {
-    const resources: { [key: string]: number } = {};
-    const recipe = getCraftingRecipe(itemName);
-    
-    // If item has no recipe or is non-craftable, treat it as a base resource
-    if (!recipe || recipe.requirements.length === 0 || NON_CRAFTABLE_MATERIALS.has(itemName)) {
-      resources[itemName] = quantity;
-      return resources;
-    }
-    
-    // Process each requirement recursively
-    for (const requirement of recipe.requirements) {
-      const totalNeeded = requirement.quantity * quantity;
-      const subResources = collectBaseResources(requirement.item, totalNeeded);
-      
-      // Combine resources, handling duplicates
-      for (const [subResourceName, subResourceQty] of Object.entries(subResources)) {
-        resources[subResourceName] = (resources[subResourceName] || 0) + subResourceQty;
-      }
-    }
-    
-    return resources;
-  };
-
-  /**
    * Calculate total crafting time recursively
    */
   const calculateTotalTime = (itemName: string, qty: number): number => {
@@ -200,13 +185,24 @@ export default function NarcosCalculatorPage() {
     
     setTimeout(() => {
       const recipe = getCraftingRecipe(selectedItem);
-      const baseResources = collectBaseResources(selectedItem, quantity);
+      
+      // Stage 3: Direct Requirements
+      const directRequirements = recipe ? recipe.requirements : [];
+      
+      // Stage 2: Sub-Direct Requirements
+      const subDirectRequirements = calculateSubDirectRequirements(selectedItem, quantity);
+      
+      // Stage 1: Base Materials
+      const baseResources = calculateBaseMaterials(selectedItem, quantity);
+      
       const totalTime = calculateTotalTime(selectedItem, quantity);
       const totalXP = calculateTotalXP(selectedItem, quantity);
       
       setResults({
         item: selectedItem,
         quantity,
+        directRequirements,
+        subDirectRequirements,
         baseResources,
         totalTime,
         totalXP,
@@ -263,6 +259,9 @@ export default function NarcosCalculatorPage() {
                   Narcos
                 </span>
               </h1>
+              <div className="text-sm text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-lg px-3 py-1">
+                🆕 Three-Stage System
+              </div>
             </div>
 
             <div className="space-y-4 sm:space-y-6">
@@ -341,7 +340,7 @@ export default function NarcosCalculatorPage() {
                 <>
                   <div className="text-center mb-8">
                     <h2 className="text-2xl font-bold mb-2" style={{ color: PURPLE_PRIMARY }}>
-                      Crafting Requirements
+                      Three-Stage Crafting Plan
                     </h2>
                     <div className="flex justify-center items-center gap-6 text-sm text-gray-400 flex-wrap">
                       <span className="flex items-center gap-2">
@@ -357,48 +356,108 @@ export default function NarcosCalculatorPage() {
                     </div>
                   </div>
 
-                  {/* Direct Requirements Section */}
-                  <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
-                    Direct Requirements
-                  </h2>
+                  {/* Three-Stage Process Flow */}
+                  <div className="mb-8 bg-white/5 border border-white/10 rounded-xl p-4">
+                    <h3 className="text-lg font-semibold text-white mb-4 text-center">Crafting Process Flow</h3>
+                    <div className="flex items-center justify-center gap-4 text-sm flex-wrap">
+                      <div className="flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg px-3 py-2">
+                        <span className="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                        <span className="text-emerald-300 font-medium">Gather Base Materials</span>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-gray-400" />
+                      <div className="flex items-center gap-2 bg-blue-500/20 border border-blue-500/30 rounded-lg px-3 py-2">
+                        <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                        <span className="text-blue-300 font-medium">Craft Intermediate Items</span>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-gray-400" />
+                      <div className="flex items-center gap-2 bg-purple-500/20 border border-purple-500/30 rounded-lg px-3 py-2">
+                        <span className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
+                        <span className="text-purple-300 font-medium">Final Assembly</span>
+                      </div>
+                    </div>
+                  </div>
 
-                  {(() => {
-                    const recipe = getCraftingRecipe(results.item);
-                    return recipe && recipe.requirements.length > 0 ? (
-                      <div className="space-y-2 mb-6">
-                        {recipe.requirements.map((req, index) => (
+                  {/* Stage 1: Base Materials Needed */}
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold border-b border-emerald-600 pb-2 mb-4 text-emerald-300 flex items-center gap-2">
+                      <span className="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                      Base Materials Needed
+                    </h2>
+                    <p className="text-gray-400 text-sm mb-4">Raw materials you need to gather/loot from the world</p>
+
+                    {Object.keys(results.baseResources).length > 0 ? (
+                      <div className="space-y-3">
+                        {Object.entries(results.baseResources)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([resource, amount]) => (
+                            <ResourceItem
+                              key={resource}
+                              resource={resource}
+                              amount={amount as number}
+                              showStage={false}
+                            />
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="text-gray-400 italic p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                        No base materials required (loot-only item)
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stage 2: Sub-Direct Requirements */}
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold border-b border-blue-600 pb-2 mb-4 text-blue-300 flex items-center gap-2">
+                      <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                      Sub-Direct Requirements
+                    </h2>
+                    <p className="text-gray-400 text-sm mb-4">Intermediate items you need to craft first</p>
+
+                    {Object.keys(results.subDirectRequirements).length > 0 ? (
+                      <div className="space-y-3">
+                        {Object.entries(results.subDirectRequirements)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([resource, amount]) => (
+                            <ResourceItem
+                              key={resource}
+                              resource={resource}
+                              amount={amount as number}
+                              showStage={false}
+                            />
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="text-gray-400 italic p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                        No intermediate components required
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stage 3: Direct Requirements */}
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold border-b border-purple-600 pb-2 mb-4 text-purple-300 flex items-center gap-2">
+                      <span className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
+                      Direct Requirements
+                    </h2>
+                    <p className="text-gray-400 text-sm mb-4">Items you need in your inventory for the final craft</p>
+
+                    {results.directRequirements.length > 0 ? (
+                      <div className="space-y-2">
+                        {results.directRequirements.map((req, index) => (
                           <ResourceItem
                             key={index}
                             resource={req.item}
                             amount={req.quantity * results.quantity}
+                            showStage={false}
                           />
                         ))}
                       </div>
                     ) : (
-                      <div className="text-gray-400 italic mb-6 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                      <div className="text-gray-400 italic p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
                         This item has no direct crafting requirements (loot-only item)
                       </div>
-                    );
-                  })()}
-
-                  {/* Resources Needed Section */}
-                  <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
-                    Base Materials Needed
-                  </h2>
-
-                  {Object.keys(results.baseResources).length > 0 && (
-                    <div className="space-y-3 mb-6">
-                      {Object.entries(results.baseResources)
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([resource, amount]) => (
-                          <ResourceItem
-                            key={resource}
-                            resource={resource}
-                            amount={amount as number}
-                          />
-                        ))}
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Summary Statistics */}
                   <div className="mt-8">
@@ -434,8 +493,7 @@ export default function NarcosCalculatorPage() {
                     </h2>
                     
                     {(() => {
-                      const recipe = getCraftingRecipe(results.item);
-                      if (!recipe || recipe.requirements.length === 0) {
+                      if (results.directRequirements.length === 0) {
                         return (
                           <div className="text-gray-400 italic p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
                             No component breakdown available for loot-only items
@@ -445,8 +503,8 @@ export default function NarcosCalculatorPage() {
 
                       return (
                         <div className="space-y-4">
-                          {recipe.requirements.map((req, index) => {
-                            const componentResources = collectBaseResources(req.item, req.quantity * results.quantity);
+                          {results.directRequirements.map((req, index) => {
+                            const componentResources = calculateBaseMaterials(req.item, req.quantity * results.quantity);
                             const hasResources = Object.keys(componentResources).length > 0;
                             
                             return (
