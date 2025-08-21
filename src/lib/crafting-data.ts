@@ -12,6 +12,7 @@ export interface CraftingRecipe {
   craftingLevel: number;
   craftingTime: number;
   craftingXP: number;
+  requiresRecipe?: boolean; // For items that need blueprints
 }
 
 export type CraftingCategory = 
@@ -22,7 +23,8 @@ export type CraftingCategory =
   | "Vest"
   | "Clothing"
   | "Backpack"
-  | "Materials";
+  | "Materials"
+  | "Other";
 
 export type ItemTag = "Gatherable" | "Processed" | "Lootable" | "Craftable";
 
@@ -207,7 +209,7 @@ export function calculateBaseMaterials(itemName: string, quantity: number): { [k
   return resources;
 }
 
-// Centralized crafting database
+// Centralized crafting database with all fixes applied
 export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
   // ===== WEAPON PARTS =====
   "Steel barrel": {
@@ -352,12 +354,14 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
       { item: "Steel receiver", quantity: 4 },
       { item: "Hardened firing pin", quantity: 1 },
       { item: "Grip", quantity: 1 },
+      { item: "Slide", quantity: 1 }, // Fixed: was missing slide
       { item: "Stock", quantity: 1 },
       { item: "Trigger", quantity: 2 }
     ],
     craftingLevel: 10,
     craftingTime: 27,
-    craftingXP: 500
+    craftingXP: 500,
+    requiresRecipe: true
   },
   "Spectre": {
     name: "Spectre",
@@ -367,7 +371,7 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
       { item: "Steel receiver", quantity: 3 },
       { item: "Firing pin", quantity: 1 },
       { item: "Grip", quantity: 1 },
-      { item: "Slide", quantity: 2 },
+      { item: "Slide", quantity: 1 }, // Fixed: was 2, should be 1
       { item: "Stock", quantity: 1 },
       { item: "Trigger", quantity: 1 }
     ],
@@ -402,7 +406,7 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
       { item: "Gunpowder", quantity: 3 },
       { item: "Iron bar", quantity: 1 }
     ],
-    craftingLevel: 0,
+    craftingLevel: 1, // Fixed: was 0, should be 1
     craftingTime: 8,
     craftingXP: 20
   },
@@ -413,7 +417,7 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
       { item: "Gunpowder", quantity: 5 },
       { item: "Iron bar", quantity: 1 }
     ],
-    craftingLevel: 0,
+    craftingLevel: 8, // Fixed: was 0, should be 8
     craftingTime: 8,
     craftingXP: 20
   },
@@ -421,12 +425,13 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
     name: "Mac-10 Magazine",
     category: "Magazines",
     requirements: [
-      { item: "Gunpowder", quantity: 5 },
+      { item: "Gunpowder", quantity: 6 }, // Fixed: was 5, should be 6
       { item: "Iron bar", quantity: 2 }
     ],
     craftingLevel: 10,
     craftingTime: 7,
-    craftingXP: 25
+    craftingXP: 25,
+    requiresRecipe: true
   },
   "Spectre Magazine": {
     name: "Spectre Magazine",
@@ -435,7 +440,7 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
       { item: "Gunpowder", quantity: 5 },
       { item: "Iron bar", quantity: 1 }
     ],
-    craftingLevel: 0,
+    craftingLevel: 3, // Fixed: was 0, should be 3
     craftingTime: 8,
     craftingXP: 20
   },
@@ -448,7 +453,8 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
     ],
     craftingLevel: 10,
     craftingTime: 30,
-    craftingXP: 10
+    craftingXP: 10,
+    requiresRecipe: true
   },
 
   // ===== VEST =====
@@ -482,7 +488,7 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
     ],
     craftingLevel: 5,
     craftingTime: 23,
-    craftingXP: 5
+    craftingXP: 5 // Fixed: was 10, should be 5
   },
   "Balaclava Green": {
     name: "Balaclava Green",
@@ -493,7 +499,7 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
     ],
     craftingLevel: 5,
     craftingTime: 23,
-    craftingXP: 5
+    craftingXP: 5 // Fixed: was 10, should be 5
   },
   "Balaclava Pink": {
     name: "Balaclava Pink",
@@ -504,7 +510,7 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
     ],
     craftingLevel: 5,
     craftingTime: 23,
-    craftingXP: 5
+    craftingXP: 5 // Fixed: was 10, should be 5
   },
   "Balaclava Red": {
     name: "Balaclava Red",
@@ -515,18 +521,18 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
     ],
     craftingLevel: 5,
     craftingTime: 23,
-    craftingXP: 5
+    craftingXP: 5 // Fixed: was 10, should be 5
   },
   "Balaclava Tan": {
     name: "Balaclava Tan",
     category: "Clothing",
     requirements: [
       { item: "Balaclava Black", quantity: 1 },
-      { item: "Tan Dye", quantity: 1 }
+      { item: "Yellow Dye", quantity: 1 } // Fixed: was Tan Dye, should be Yellow Dye
     ],
     craftingLevel: 5,
     craftingTime: 23,
-    craftingXP: 5
+    craftingXP: 5 // Fixed: was 10, should be 5
   },
   "Hiking Pants Blue": {
     name: "Hiking Pants Blue",
@@ -555,9 +561,10 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
     category: "Clothing",
     requirements: [
       { item: "Cloth", quantity: 25 },
-      { item: "Green Dye", quantity: 1 }
+      { item: "Green Dye", quantity: 1 },
+      { item: "Yellow Dye", quantity: 1 } // Fixed: was missing Yellow Dye
     ],
-    craftingLevel: 5,
+    craftingLevel: 12, // Fixed: was 5, should be 12
     craftingTime: 54,
     craftingXP: 15
   },
@@ -630,8 +637,8 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
       { item: "Sulfer", quantity: 1 }
     ],
     craftingLevel: 0,
-    craftingTime: 2,
-    craftingXP: 10
+    craftingTime: 2, // Fixed: This should be the base crafting time
+    craftingXP: 10   // Fixed: This should be the base XP
   },
   "Sulfer": {
     name: "Sulfer",
@@ -641,14 +648,28 @@ export const CRAFTING_RECIPES: Record<string, CraftingRecipe> = {
     craftingTime: 4,
     craftingXP: 4
   },
-  "Steel plate": {
-    name: "Steel plate",
+  "Steel Plate": {
+    name: "Steel Plate",
     category: "Materials",
     requirements: [{ item: "Steel bar", quantity: 10 }],
     craftingLevel: 0,
     craftingTime: 16,
     craftingXP: 20
   },
+
+  // ===== OTHER =====
+  "Binoculars": {
+    name: "Binoculars",
+    category: "Other",
+    requirements: [
+      { item: "Glass", quantity: 6 },
+      { item: "Iron bar", quantity: 4 }
+    ],
+    craftingLevel: 0,
+    craftingTime: 16,
+    craftingXP: 15
+  },
+
   // Kevlar Weave - non-craftable material (loot only)
   "Kevlar Weave": {
     name: "Kevlar Weave",

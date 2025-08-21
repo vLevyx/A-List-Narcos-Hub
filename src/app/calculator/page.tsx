@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ChevronDown, Package, Clock, Zap, AlertCircle, RotateCcw, ArrowRight } from 'lucide-react';
+import { ChevronDown, Package, Clock, Zap, AlertCircle, RotateCcw, ArrowRight, CheckCircle2, Circle, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePageTracking } from '@/hooks/usePageTracking';
 import { CustomDropdown } from '@/components/ui/CustomDropdown';
@@ -36,28 +36,71 @@ interface CalculationResults {
   totalTime: number;
   totalXP: number;
   craftingLevel: number;
+  requiresRecipe?: boolean;
 }
 
-// Resource display component with tags
+interface CraftingSettings {
+  hasCraftingPerk: boolean;
+  craftingPerkLevel: number; // 0 = no perk, 1 = 10% reduction, 2 = 20% reduction
+}
+
+// Progress tracking interface
+interface ProgressTracker {
+  [itemName: string]: {
+    required: number;
+    collected: number;
+    completed: boolean;
+  };
+}
+
+// Resource display component with tags and progress tracking
 const ResourceItem = ({ 
   resource, 
   amount, 
   className = "",
   showStage = false,
-  stage = ""
+  stage = "",
+  progress,
+  onProgressChange
 }: { 
   resource: string; 
   amount: number; 
   className?: string;
   showStage?: boolean;
   stage?: string;
+  progress?: { required: number; collected: number; completed: boolean };
+  onProgressChange?: (resource: string, collected: number) => void;
 }) => {
   const tag = getItemTag(resource);
   const tagColors = getTagColors(tag);
   
+  const handleProgressClick = () => {
+    if (!progress || !onProgressChange) return;
+    const newCollected = progress.completed ? 0 : progress.required;
+    onProgressChange(resource, newCollected);
+  };
+
+  const handleCollectedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!onProgressChange) return;
+    const value = parseInt(e.target.value) || 0;
+    const clampedValue = Math.max(0, Math.min(value, progress?.required || amount));
+    onProgressChange(resource, clampedValue);
+  };
+  
   return (
-    <div className={`flex justify-between items-center p-3 rounded-lg ${tagColors.bg} border ${tagColors.border} ${className}`}>
-      <div className="flex items-center gap-2">
+    <div className={`flex justify-between items-center p-3 rounded-lg ${tagColors.bg} border ${tagColors.border} ${className} ${progress?.completed ? 'opacity-75' : ''}`}>
+      <div className="flex items-center gap-2 flex-1">
+        <button
+          onClick={handleProgressClick}
+          className="flex-shrink-0 hover:scale-110 transition-transform"
+          aria-label={`Mark ${resource} as ${progress?.completed ? 'incomplete' : 'complete'}`}
+        >
+          {progress?.completed ? (
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+          ) : (
+            <Circle className="w-5 h-5 text-gray-400" />
+          )}
+        </button>
         <span className="text-white/90 font-medium">{resource}</span>
         <span className={`text-xs px-2 py-0.5 rounded font-medium ${tagColors.bg} ${tagColors.text} border ${tagColors.border}`}>
           {tag}
@@ -68,7 +111,22 @@ const ResourceItem = ({
           </span>
         )}
       </div>
-      <span className={`font-bold ${tagColors.text}`}>{amount.toLocaleString()}</span>
+      <div className="flex items-center gap-2">
+        {progress && (
+          <div className="flex items-center gap-1 text-sm">
+            <input
+              type="number"
+              min="0"
+              max={progress.required}
+              value={progress.collected}
+              onChange={handleCollectedChange}
+              className="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white text-center text-xs"
+            />
+            <span className="text-gray-400">/</span>
+          </div>
+        )}
+        <span className={`font-bold ${tagColors.text}`}>{amount.toLocaleString()}</span>
+      </div>
     </div>
   );
 };
@@ -99,6 +157,82 @@ const ComponentResourceItem = ({
   );
 };
 
+// Settings modal component
+const SettingsModal = ({ 
+  settings, 
+  onSettingsChange, 
+  onClose 
+}: { 
+  settings: CraftingSettings;
+  onSettingsChange: (settings: CraftingSettings) => void;
+  onClose: () => void;
+}) => {
+  const [localSettings, setLocalSettings] = useState(settings);
+
+  const handleSave = () => {
+    onSettingsChange(localSettings);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-background-secondary border border-white/10 rounded-2xl p-6 max-w-md w-full">
+        <h3 className="text-xl font-bold text-white mb-4">Crafting Settings</h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={localSettings.hasCraftingPerk}
+                onChange={(e) => setLocalSettings({
+                  ...localSettings,
+                  hasCraftingPerk: e.target.checked,
+                  craftingPerkLevel: e.target.checked ? localSettings.craftingPerkLevel : 0
+                })}
+                className="w-4 h-4 text-purple-500 rounded focus:ring-purple-500"
+              />
+              <span className="text-white">I have the Crafting Perk</span>
+            </label>
+          </div>
+
+          {localSettings.hasCraftingPerk && (
+            <div>
+              <label className="block text-white/90 font-medium mb-2">Perk Level</label>
+              <select
+                value={localSettings.craftingPerkLevel}
+                onChange={(e) => setLocalSettings({
+                  ...localSettings,
+                  craftingPerkLevel: parseInt(e.target.value)
+                })}
+                className="w-full bg-[#2a2a2a] border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500"
+              >
+                <option value={1}>Level 1 (10% faster)</option>
+                <option value={2}>Level 2 (20% faster)</option>
+              </select>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function NarcosCalculatorPage() {
   usePageTracking();
   const { hasAccess, loading, user } = useAuth();
@@ -108,8 +242,85 @@ export default function NarcosCalculatorPage() {
   const [quantity, setQuantity] = useState(1);
   const [results, setResults] = useState<CalculationResults | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [progress, setProgress] = useState<ProgressTracker>({});
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState<CraftingSettings>({
+    hasCraftingPerk: false,
+    craftingPerkLevel: 0
+  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
 
-  // Generate category options from the organized data
+  // Load recently viewed from localStorage on component mount
+  useEffect(() => {
+    const stored = localStorage.getItem('narcos-calculator-recent');
+    if (stored) {
+      try {
+        setRecentlyViewed(JSON.parse(stored));
+      } catch (e) {
+        console.warn('Failed to parse recently viewed items');
+      }
+    }
+  }, []);
+
+  // Add item to recently viewed list
+  const addToRecentlyViewed = (itemName: string) => {
+    setRecentlyViewed(prev => {
+      const filtered = prev.filter(item => item !== itemName);
+      const updated = [itemName, ...filtered].slice(0, 5); // Keep only last 5 items
+      localStorage.setItem('narcos-calculator-recent', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Search functionality
+  const searchAllItems = (query: string) => {
+    if (!query.trim()) return [];
+    
+    const lowercaseQuery = query.toLowerCase();
+    const allItems = Object.values(CRAFTING_RECIPES)
+      .map(recipe => ({
+        name: recipe.name,
+        category: recipe.category,
+        level: recipe.craftingLevel,
+        requiresRecipe: recipe.requiresRecipe
+      }))
+      .filter(item => item.name.toLowerCase().includes(lowercaseQuery))
+      .sort((a, b) => {
+        // Prioritize exact matches, then alphabetical
+        const aStartsWith = a.name.toLowerCase().startsWith(lowercaseQuery);
+        const bStartsWith = b.name.toLowerCase().startsWith(lowercaseQuery);
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 8); // Limit to 8 results
+
+    return allItems;
+  };
+
+  const searchResults = searchQuery ? searchAllItems(searchQuery) : [];
+
+  const handleSearchSelect = (itemName: string) => {
+    const recipe = getCraftingRecipe(itemName);
+    if (recipe) {
+      setSelectedCategory(recipe.category);
+      setSelectedItem(itemName);
+      setSearchQuery("");
+      setShowSearchResults(false);
+      addToRecentlyViewed(itemName);
+    }
+  };
+
+  const handleRecentSelect = (itemName: string) => {
+    const recipe = getCraftingRecipe(itemName);
+    if (recipe) {
+      setSelectedCategory(recipe.category);
+      setSelectedItem(itemName);
+      addToRecentlyViewed(itemName);
+    }
+  };
   const categoryOptions = [
     { value: "", label: "Select Category" },
     ...getAllCategories().map(category => ({
@@ -118,68 +329,76 @@ export default function NarcosCalculatorPage() {
     }))
   ];
 
-  // Generate item options from the organized data
+  // Generate item options from the organized data (without tags in labels)
   const itemOptions = [
     { value: "", label: "Select Item" },
     ...(selectedCategory 
       ? getItemsByCategory(selectedCategory as CraftingCategory).map(item => {
           const recipe = getCraftingRecipe(item);
-          const tag = getItemTag(item);
+          let label = item;
+          
+          if (recipe && recipe.craftingLevel > 0) {
+            label += ` (Level ${recipe.craftingLevel})`;
+          }
+          
+          if (recipe && recipe.requiresRecipe) {
+            label += ` [Requires Recipe]`;
+          }
+          
           return {
             value: item,
-            label: `${item}${recipe && recipe.craftingLevel > 0 ? ` (Level ${recipe.craftingLevel})` : ''} [${tag}]`
+            label
           };
         })
       : [])
   ];
 
   /**
-   * Calculate total crafting time recursively
+   * Apply crafting perk time reduction
    */
-  const calculateTotalTime = (itemName: string, qty: number): number => {
-    const recipe = getCraftingRecipe(itemName);
+  const applyCraftingPerkTime = (baseTime: number): number => {
+    if (!settings.hasCraftingPerk) return baseTime;
     
-    // If item has no recipe or is non-craftable, no time required
-    if (!recipe || recipe.requirements.length === 0 || NON_CRAFTABLE_MATERIALS.has(itemName)) {
-      return 0;
-    }
-    
-    let totalTime = recipe.craftingTime * qty;
-    
-    // Add time for all sub-components
-    for (const requirement of recipe.requirements) {
-      totalTime += calculateTotalTime(requirement.item, requirement.quantity * qty);
-    }
-    
-    return totalTime;
+    const reductionPercent = settings.craftingPerkLevel === 2 ? 0.20 : 0.10;
+    return Math.ceil(baseTime * (1 - reductionPercent));
   };
 
   /**
-   * Calculate total crafting XP recursively
+   * Calculate crafting time for ONLY the final item (not recursive)
    */
-  const calculateTotalXP = (itemName: string, qty: number): number => {
+  const calculateFinalItemTime = (itemName: string, qty: number): number => {
     const recipe = getCraftingRecipe(itemName);
     
-    // If item has no recipe or is non-craftable, no XP gained
     if (!recipe || recipe.requirements.length === 0 || NON_CRAFTABLE_MATERIALS.has(itemName)) {
       return 0;
     }
     
-    let totalXP = recipe.craftingXP * qty;
-    
-    // Add XP for all sub-components
-    for (const requirement of recipe.requirements) {
-      totalXP += calculateTotalXP(requirement.item, requirement.quantity * qty);
-    }
-    
-    return totalXP;
+    const baseTime = recipe.craftingTime * qty;
+    return applyCraftingPerkTime(baseTime);
   };
 
+  /**
+   * Calculate crafting XP for ONLY the final item (not recursive)
+   */
+  const calculateFinalItemXP = (itemName: string, qty: number): number => {
+    const recipe = getCraftingRecipe(itemName);
+    
+    if (!recipe || recipe.requirements.length === 0 || NON_CRAFTABLE_MATERIALS.has(itemName)) {
+      return 0;
+    }
+    
+    return recipe.craftingXP * qty;
+  };
+
+  // Update calculate materials to add to recently viewed
   const calculateMaterials = () => {
     if (!selectedItem || quantity <= 0) {
       setResults(null);
       return;
     }
+    
+    // Add to recently viewed when calculating
+    addToRecentlyViewed(selectedItem);
     
     setIsCalculating(true);
     
@@ -195,8 +414,9 @@ export default function NarcosCalculatorPage() {
       // Stage 1: Base Materials
       const baseResources = calculateBaseMaterials(selectedItem, quantity);
       
-      const totalTime = calculateTotalTime(selectedItem, quantity);
-      const totalXP = calculateTotalXP(selectedItem, quantity);
+      // Fixed: Only calculate time and XP for the final item
+      const totalTime = calculateFinalItemTime(selectedItem, quantity);
+      const totalXP = calculateFinalItemXP(selectedItem, quantity);
       
       setResults({
         item: selectedItem,
@@ -206,11 +426,46 @@ export default function NarcosCalculatorPage() {
         baseResources,
         totalTime,
         totalXP,
-        craftingLevel: recipe?.craftingLevel || 0
+        craftingLevel: recipe?.craftingLevel || 0,
+        requiresRecipe: recipe?.requiresRecipe || false
       });
+      
+      // Initialize progress tracking
+      const newProgress: ProgressTracker = {};
+      Object.entries(baseResources).forEach(([resource, amount]) => {
+        newProgress[resource] = {
+          required: amount as number,
+          collected: 0,
+          completed: false
+        };
+      });
+      setProgress(newProgress);
       
       setIsCalculating(false);
     }, 300);
+  };
+
+  const handleProgressChange = (resource: string, collected: number) => {
+    setProgress(prev => ({
+      ...prev,
+      [resource]: {
+        ...prev[resource],
+        collected,
+        completed: collected >= prev[resource].required
+      }
+    }));
+  };
+
+  const resetProgress = () => {
+    const newProgress: ProgressTracker = {};
+    Object.entries(progress).forEach(([resource, data]) => {
+      newProgress[resource] = {
+        ...data,
+        collected: 0,
+        completed: false
+      };
+    });
+    setProgress(newProgress);
   };
 
   useEffect(() => {
@@ -218,8 +473,22 @@ export default function NarcosCalculatorPage() {
       calculateMaterials();
     } else {
       setResults(null);
+      setProgress({});
     }
-  }, [selectedItem, quantity]);
+  }, [selectedItem, quantity, settings]);
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.search-container')) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const formatTime = (seconds: number): string => {
     if (seconds < 60) return `${seconds}s`;
@@ -235,7 +504,20 @@ export default function NarcosCalculatorPage() {
     setSelectedItem("");
     setQuantity(1);
     setResults(null);
+    setProgress({});
   };
+
+  // Calculate completion progress based on actual quantities collected
+  const { totalCollected, totalRequired, completionPercentage } = Object.values(progress).reduce(
+    (acc, item) => ({
+      totalCollected: acc.totalCollected + item.collected,
+      totalRequired: acc.totalRequired + item.required,
+      completionPercentage: 0 // Will calculate below
+    }),
+    { totalCollected: 0, totalRequired: 0, completionPercentage: 0 }
+  );
+  
+  const actualCompletionPercentage = totalRequired > 0 ? Math.round((totalCollected / totalRequired) * 100) : 0;
 
   if (loading && !user) {
     return (
@@ -259,23 +541,118 @@ export default function NarcosCalculatorPage() {
                   Narcos
                 </span>
               </h1>
-              <div className="text-sm text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-lg px-3 py-1">
-                🆕 Three-Stage System
-              </div>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-all duration-300"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </button>
             </div>
 
             <div className="space-y-4 sm:space-y-6">
 
+              {/* Quick Search */}
+              <div className="relative search-container">
+                <label className="block text-white/90 font-medium mb-3">Quick Search</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowSearchResults(e.target.value.length > 0);
+                    }}
+                    onFocus={() => setShowSearchResults(searchQuery.length > 0)}
+                    placeholder="Type to search all items..."
+                    className="w-full bg-[#2a2a2a] border border-white/20 rounded-xl px-4 py-3 pr-10 text-white 
+                             focus:outline-none focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/20 
+                             transition-all placeholder:text-gray-400"
+                  />
+                  <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" 
+                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                
+                {/* Search Results Dropdown */}
+                {showSearchResults && searchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-[#2a2a2a] border border-white/20 rounded-xl shadow-2xl z-[60] max-h-80 overflow-y-auto">
+                    {searchResults.map((item, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSearchSelect(item.name)}
+                        className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0 group"
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="text-white font-medium group-hover:text-purple-300 transition-colors">
+                              {item.name}
+                            </span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-400">{item.category}</span>
+                              {item.level > 0 && (
+                                <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded">
+                                  Level {item.level}
+                                </span>
+                              )}
+                              {item.requiresRecipe && (
+                                <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded">
+                                  Recipe Required
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-purple-300 transition-colors" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Recently Viewed */}
+              {recentlyViewed.length > 0 && (
+                <div>
+                  <label className="block text-white/90 font-medium mb-3">Recently Viewed</label>
+                  <div className="flex flex-wrap gap-2">
+                    {recentlyViewed.map((itemName, index) => {
+                      const recipe = getCraftingRecipe(itemName);
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => handleRecentSelect(itemName)}
+                          className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 
+                                   rounded-lg transition-all duration-200 group"
+                        >
+                          <Clock className="w-3 h-3 text-purple-300" />
+                          <span className="text-sm text-white group-hover:text-purple-200">
+                            {itemName}
+                          </span>
+                          {recipe && recipe.craftingLevel > 0 && (
+                            <span className="text-xs px-1 py-0.5 bg-purple-600/50 text-purple-200 rounded">
+                              {recipe.craftingLevel}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Category Dropdown */}
               <div>
                 <label className="block text-white/90 font-medium mb-3">Category</label>
-                <div className="w-full border border-white/20 rounded-xl bg-[#2a2a2a]">
+                <div className="w-full border border-white/20 rounded-xl bg-[#2a2a2a] relative z-50">
                   <CustomDropdown
                     value={selectedCategory}
                     onChange={(value) => {
                       setSelectedCategory(value);
                       setSelectedItem("");
                       setResults(null);
+                      setProgress({});
                     }}
                     options={categoryOptions}
                     placeholder="Select Category"
@@ -286,7 +663,7 @@ export default function NarcosCalculatorPage() {
               {/* Item Dropdown */}
               <div>
                 <label className="block text-white/90 font-medium mb-3">Item</label>
-                <div className={`w-full border border-white/20 rounded-xl bg-[#2a2a2a] ${!selectedCategory ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className={`w-full border border-white/20 rounded-xl bg-[#2a2a2a] relative z-40 ${!selectedCategory ? 'opacity-50 pointer-events-none' : ''}`}>
                   <CustomDropdown
                     value={selectedItem}
                     onChange={(value) => setSelectedItem(value)}
@@ -315,21 +692,52 @@ export default function NarcosCalculatorPage() {
               </div>
 
               {(selectedCategory || selectedItem || results) && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={resetCalculator}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-all duration-300"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reset
-                  </button>
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                  <div className="flex gap-3">
+                    <button
+                      onClick={resetCalculator}
+                      className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-all duration-300"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Reset
+                    </button>
+                    
+                    {Object.keys(progress).length > 0 && (
+                      <button
+                        onClick={resetProgress}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-300"
+                      >
+                        <Circle className="w-4 h-4" />
+                        Reset Progress
+                      </button>
+                    )}
+                  </div>
+                  
+                  {Object.keys(progress).length > 0 && (
+                    <div className="text-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-400">
+                          Progress: {totalCollected.toLocaleString()}/{totalRequired.toLocaleString()} items ({actualCompletionPercentage}%)
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-purple-500 via-purple-400 to-purple-300 shadow-lg"
+                          style={{ 
+                            width: `${actualCompletionPercentage}%`,
+                            boxShadow: actualCompletionPercentage > 0 ? '0 0 10px rgba(139, 92, 246, 0.4)' : 'none'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
           {(results || isCalculating) && (
-            <div className="mt-8 bg-background-secondary/80 backdrop-blur-lg border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
+            <div className="mt-8 bg-background-secondary/80 backdrop-blur-lg border border-white/5 rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl relative z-10">
               
               {isCalculating ? (
                 <div className="text-center py-12">
@@ -353,27 +761,12 @@ export default function NarcosCalculatorPage() {
                           Level {results.craftingLevel} Required
                         </span>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Three-Stage Process Flow */}
-                  <div className="mb-8 bg-white/5 border border-white/10 rounded-xl p-4">
-                    <h3 className="text-lg font-semibold text-white mb-4 text-center">Crafting Process Flow</h3>
-                    <div className="flex items-center justify-center gap-4 text-sm flex-wrap">
-                      <div className="flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg px-3 py-2">
-                        <span className="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
-                        <span className="text-emerald-300 font-medium">Gather Base Materials</span>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-gray-400" />
-                      <div className="flex items-center gap-2 bg-blue-500/20 border border-blue-500/30 rounded-lg px-3 py-2">
-                        <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
-                        <span className="text-blue-300 font-medium">Craft Intermediate Items</span>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-gray-400" />
-                      <div className="flex items-center gap-2 bg-purple-500/20 border border-purple-500/30 rounded-lg px-3 py-2">
-                        <span className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
-                        <span className="text-purple-300 font-medium">Final Assembly</span>
-                      </div>
+                      {results.requiresRecipe && (
+                        <span className="flex items-center gap-2 text-amber-400">
+                          <AlertCircle className="w-4 h-4" />
+                          Requires Recipe/Blueprint
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -394,7 +787,8 @@ export default function NarcosCalculatorPage() {
                               key={resource}
                               resource={resource}
                               amount={amount as number}
-                              showStage={false}
+                              progress={progress[resource]}
+                              onProgressChange={handleProgressChange}
                             />
                           ))}
                       </div>
@@ -422,7 +816,6 @@ export default function NarcosCalculatorPage() {
                               key={resource}
                               resource={resource}
                               amount={amount as number}
-                              showStage={false}
                             />
                           ))}
                       </div>
@@ -448,7 +841,6 @@ export default function NarcosCalculatorPage() {
                             key={index}
                             resource={req.item}
                             amount={req.quantity * results.quantity}
-                            showStage={false}
                           />
                         ))}
                       </div>
@@ -476,12 +868,19 @@ export default function NarcosCalculatorPage() {
                         <div className="text-sm text-gray-400">Total Items</div>
                       </div>
                       <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-center">
-                        <div className="text-2xl font-bold text-yellow-300">{formatTime(results.totalTime)}</div>
-                        <div className="text-sm text-gray-400">Crafting Time</div>
+                        <div className="text-2xl font-bold text-yellow-300">
+                          {formatTime(results.totalTime)}
+                          {settings.hasCraftingPerk && (
+                            <span className="text-xs text-green-400 block">
+                              -{settings.craftingPerkLevel * 10}% Perk
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-400">Final Craft Time</div>
                       </div>
                       <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 text-center">
                         <div className="text-2xl font-bold text-purple-300">{results.totalXP.toLocaleString()}</div>
-                        <div className="text-sm text-gray-400">Total XP</div>
+                        <div className="text-sm text-gray-400">Final Craft XP</div>
                       </div>
                     </div>
                   </div>
@@ -572,6 +971,15 @@ export default function NarcosCalculatorPage() {
           )}
         </div>
       </div>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <SettingsModal
+          settings={settings}
+          onSettingsChange={setSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }
