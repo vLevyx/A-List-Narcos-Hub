@@ -38,23 +38,31 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-1 md:col-span-1">
-            <Link href="/" className="flex items-center space-x-3 group mb-4">
-              <div className="flex flex-col">
-                <span className="text-lg font-bold gradient-text">
-                  A-List Narcos
-                </span>
-                <span className="text-xs text-text-secondary -mt-1">Hub</span>
-              </div>
-            </Link>
-            <p className="text-text-secondary text-sm mb-4 max-w-xs">
-              Premium tools for Narcos Life.
-              Built for those who demand excellence.
-            </p>
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs text-green-400">All systems operational</span>
-            </div>
-          </div>
+  <Link href="/" className="flex items-center space-x-3 group mb-4">
+    <div className="flex flex-col">
+      <span className="text-lg font-bold gradient-text">
+        A-List Narcos
+      </span>
+      <span className="text-xs text-text-secondary -mt-1">Hub</span>
+    </div>
+  </Link>
+  <p className="text-text-secondary text-sm mb-4 max-w-xs">
+    Premium tools for Narcos Life.
+    Built for those who demand excellence.
+  </p>
+  
+  {/* Community Disclaimer */}
+<div className="mb-4 p-3 bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/20 rounded-lg">
+  <p className="text-purple-300 text-xs font-medium leading-relaxed">
+    For the Community, by the Community | Not Affiliated with Narcos Life RP
+  </p>
+</div>
+  
+  <div className="flex items-center space-x-2">
+    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+    <span className="text-xs text-green-400">All systems operational</span>
+  </div>
+</div>
 
           {/* Footer Sections */}
           {footerSections.map((section, index) => (
@@ -105,7 +113,7 @@ export function Footer() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 text-xs text-text-secondary">
                 <div className="w-2 h-2 bg-accent-primary rounded-full"></div>
-                <span>BETA 0.0.5</span>
+                <span>BETA 0.0.6</span>
               </div>
               
               {/* Security Badge */}

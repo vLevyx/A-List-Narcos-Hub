@@ -701,36 +701,17 @@ const checkUserAccess = async (
   const signInWithDiscord = async () => {
   try {
     setError(null);
-    
-    // Step 1: Get Supabase to generate the OAuth URL with proper state
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: "identify",
+        scopes: "identify email", // Include email for Supabase compatibility
       },
     });
-    
     if (error) throw error;
-    
-    // Step 2: Intercept and modify the URL before redirect
-    if (data?.url) {
-      const originalUrl = new URL(data.url);
-      
-      // Force scope to be identify only (override any other scopes)
-      originalUrl.searchParams.set('scope', 'identify');
-      
-      // Redirect with the modified URL
-      window.location.href = originalUrl.toString();
-    }
-    
   } catch (error) {
     console.error("Error signing in with Discord:", error);
-    setError(
-      error instanceof Error
-        ? error
-        : new Error("Failed to sign in with Discord")
-    );
+    setError(error instanceof Error ? error : new Error("Failed to sign in with Discord"));
   }
 };
 

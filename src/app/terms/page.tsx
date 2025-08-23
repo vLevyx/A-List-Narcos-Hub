@@ -32,8 +32,8 @@ export default function TermsOfServicePage() {
     {
       title: "2. Description of Service",
       content: [
-        "A-List Hub provides tools, calculators, databases, and community features specifically designed for Narcos Life players.",
-        "Our services include but are not limited to: price calculators, blueprint databases, license information, vehicle data, and community forums.",
+        "A-List Hub provides tools, calculators, and community features specifically designed for Narcos Life players.",
+        "Our services include but are not limited to: price calculators, license information, vehicle data, and community forums.",
         "We reserve the right to modify, suspend, or discontinue any aspect of our service at any time without prior notice."
       ]
     },
@@ -50,8 +50,7 @@ export default function TermsOfServicePage() {
       title: "4. Acceptable Use Policy",
       content: [
         "Users must not use our service for any unlawful purpose or to solicit the performance of unlawful acts.",
-        "Harassment, abuse, or threatening behavior towards other users or staff is strictly prohibited.",
-        "Attempts to exploit, hack, or compromise our systems will result in immediate account termination and may be reported to authorities.",
+        "Attempts to exploit, hack, or compromise our systems will result in immediate account termination and may be reported.",
         "Users must respect intellectual property rights and not share premium content with non-whitelisted individuals.",
         "Any form of spam, automated requests, or attempts to overload our systems is prohibited."
       ]
@@ -107,7 +106,7 @@ export default function TermsOfServicePage() {
       content: [
         "For questions about these Terms of Service, please contact us through our Discord server.",
         "Official support is only provided through our verified Discord channels.",
-        "We aim to respond to all inquiries within 48 hours during normal business operations."
+        "We aim to respond to all inquiries within 48 hours during normal operations."
       ]
     }
   ]

@@ -835,34 +835,40 @@ const handleSubmit = useCallback(
                   <div className="space-y-4 sm:space-y-6">
                     {/* Pricing Card - Mobile Optimized */}
                     <div className="bg-gradient-to-br from-purple-400/10 to-purple-600/10 border border-purple-400/30 rounded-2xl p-4 sm:p-6 text-center relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"></div>
-                      <div className="relative z-10">
-                        <h4 className="text-purple-400 text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
-                          💎 Premium Price
-                        </h4>
-                        <div className="text-2xl sm:text-3xl lg:text-4xl font-black text-white mb-2">
-                          <div
-                            className={`break-words ${
-                              DISCOUNT_ENABLED
-                                ? "line-through opacity-60 text-xl sm:text-2xl"
-                                : ""
-                            }`}
-                          >
-                            ${ORIGINAL_PRICE.toLocaleString()}
-                          </div>
-                          {DISCOUNT_ENABLED && (
-                            <div className="text-purple-400 mt-2">
-                              <div className="break-words">
-                                ${DISCOUNTED_PRICE.toLocaleString()}
-                              </div>
-                              <span className="inline-block bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-semibold px-2 py-1 sm:px-3 sm:py-1 rounded-full mt-2 animate-bounce">
-                                15% OFF
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"></div>
+  <div className="relative z-10">
+    <h4 className="text-purple-400 text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
+      💎 Premium Price
+    </h4>
+    <div className="text-2xl sm:text-3xl lg:text-4xl font-black text-white mb-2">
+      <div
+        className={`break-words ${
+          DISCOUNT_ENABLED
+            ? "line-through opacity-60 text-xl sm:text-2xl"
+            : ""
+        }`}
+      >
+        ${ORIGINAL_PRICE.toLocaleString()}
+      </div>
+      {DISCOUNT_ENABLED && (
+        <div className="text-purple-400 mt-2">
+          <div className="break-words">
+            ${DISCOUNTED_PRICE.toLocaleString()}
+          </div>
+          <span className="inline-block bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-semibold px-2 py-1 sm:px-3 sm:py-1 rounded-full mt-2 animate-bounce">
+            15% OFF
+          </span>
+        </div>
+      )}
+    </div>
+    {/* Currency Note */}
+    <div className="mt-3 px-3 py-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl">
+      <p className="text-amber-300 text-xs sm:text-sm font-medium break-words">
+        💰 In-game (Narcos Life RP) currency only
+      </p>
+    </div>
+  </div>
+</div>
 
                     {/* Trial Bonus - Mobile Optimized */}
                     <div className="bg-gradient-to-br from-purple-500/10 to-violet-500/10 border border-purple-500/30 rounded-2xl p-4 sm:p-6 text-center">
