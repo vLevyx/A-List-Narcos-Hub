@@ -11,6 +11,16 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
+    "/calculator/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/calculator/page.js"
+    ],
+    "/calculator/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/calculator/layout.js"
+    ],
     "/whitelist/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -21,25 +31,30 @@
       "static/chunks/main-app.js",
       "static/chunks/app/whitelist/layout.js"
     ],
-    "/docs/page": [
+    "/profile/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/docs/page.js"
+      "static/chunks/app/profile/page.js"
     ],
-    "/terms/page": [
+    "/profile/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/terms/page.js"
+      "static/chunks/app/profile/layout.js"
     ],
-    "/privacy/page": [
+    "/starter-guide/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/privacy/page.js"
+      "static/chunks/app/starter-guide/page.js"
     ],
-    "/security/page": [
+    "/starter-guide/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/security/page.js"
+      "static/chunks/app/starter-guide/layout.js"
+    ],
+    "/_not-found/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/_not-found/page.js"
     ]
   }
 }

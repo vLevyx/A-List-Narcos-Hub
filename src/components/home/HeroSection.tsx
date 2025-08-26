@@ -171,7 +171,7 @@ export function HeroSection() {
                   
                   <p className="text-xl text-white/80 mb-8 leading-relaxed max-w-2xl mx-auto">
                     {hasAccess 
-                      ? "Access all premium tools and enjoy the full A-List experience with priority support and exclusive features."
+                      ? "Access all premium tools and enjoy the full A-List experience."
                       : "Join the dedicated players with exclusive access to advanced calculators, comprehensive guides, and premium tools that give you the competitive edge."
                     }
                   </p>

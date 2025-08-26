@@ -1,8 +1,8 @@
 {
-  "/docs/page": "app/docs/page.js",
-  "/terms/page": "app/terms/page.js",
-  "/privacy/page": "app/privacy/page.js",
-  "/security/page": "app/security/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js",
-  "/whitelist/page": "app/whitelist/page.js"
+  "/calculator/page": "app/calculator/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/whitelist/page": "app/whitelist/page.js",
+  "/starter-guide/page": "app/starter-guide/page.js"
 }

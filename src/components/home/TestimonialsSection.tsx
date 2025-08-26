@@ -140,7 +140,7 @@ export function TestimonialsSection() {
             Join the Community
           </h4>
           <p className="text-white/80 mb-6">
-            Experience the tools that thousands of players rely on every day.
+            Experience the tools that hundreds of players rely on every day.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
