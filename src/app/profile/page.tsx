@@ -307,7 +307,8 @@ export default function ProfilePage() {
         const mostVisitedPage = Object.entries(pageVisits)
           .sort(([, a], [, b]) => (typeof b === 'number' ? b : 0) - (typeof a === 'number' ? a : 0))[0]?.[0] || '/dashboard'
 
-        const weeklyActivity = generateWeeklyActivity(sessions)
+        // Calculate actual weekly activity from sessions
+        const weeklyActivity = calculateWeeklyActivity(sessions)
         
         const popularPages = Object.entries(pageVisits)
           .map(([path, visits]) => ({
@@ -323,9 +324,8 @@ export default function ProfilePage() {
           .sort((a, b) => b.visits - a.visits)
           .slice(0, 5)
 
-        // Mock streak data - in production, calculate from actual session dates
-        const currentStreak = Math.floor(Math.random() * 15) + 1
-        const longestStreak = Math.max(currentStreak, Math.floor(Math.random() * 30) + 1)
+        // Calculate activity streaks from actual session data
+        const streaks = calculateActivityStreaks(sessions)
 
         setSessionAnalytics({
           totalSessions,
@@ -335,15 +335,167 @@ export default function ProfilePage() {
           lastSeenDevice: 'Desktop',
           weeklyActivity,
           popularPages,
-          currentStreak,
-          longestStreak,
+          currentStreak: streaks.currentStreak,
+          longestStreak: streaks.longestStreak,
           lastActiveDate: sessions[0]?.created_at || null
+        })
+      } else {
+        // No sessions yet
+        setSessionAnalytics({
+          totalSessions: 0,
+          totalTimeSpent: 0,
+          averageSessionTime: 0,
+          mostVisitedPage: '/dashboard',
+          lastSeenDevice: 'Desktop',
+          weeklyActivity: getEmptyWeeklyActivity(),
+          popularPages: [],
+          currentStreak: 0,
+          longestStreak: 0,
+          lastActiveDate: null
         })
       }
     } catch (error) {
       console.error('Error loading session analytics:', error)
     }
   }, [supabase])
+
+  // Helper function to calculate actual weekly activity from sessions
+  const calculateWeeklyActivity = (sessions: any[]): Array<{ day: string; sessions: number; timeSpent: number }> => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const now = new Date()
+    
+    // Get start of current week (Monday)
+    const startOfWeek = new Date(now)
+    const dayOfWeek = now.getDay()
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Handle Sunday = 0
+    startOfWeek.setDate(now.getDate() + diff)
+    startOfWeek.setHours(0, 0, 0, 0)
+    
+    return days.map((day, index) => {
+      const dayStart = new Date(startOfWeek)
+      dayStart.setDate(startOfWeek.getDate() + index)
+      
+      const dayEnd = new Date(dayStart)
+      dayEnd.setHours(23, 59, 59, 999)
+      
+      // Filter sessions for this specific day
+      const daySessions = sessions.filter(session => {
+        const sessionDate = new Date(session.created_at)
+        return sessionDate >= dayStart && sessionDate <= dayEnd
+      })
+      
+      const dayTimeSpent = daySessions.reduce((sum, session) => {
+        const timeSpent = session.time_spent_seconds
+        return sum + (typeof timeSpent === 'number' ? timeSpent : 0)
+      }, 0)
+      
+      return {
+        day,
+        sessions: daySessions.length,
+        timeSpent: dayTimeSpent
+      }
+    })
+  }
+
+  // Helper function to get empty weekly activity
+  const getEmptyWeeklyActivity = (): Array<{ day: string; sessions: number; timeSpent: number }> => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    return days.map(day => ({ day, sessions: 0, timeSpent: 0 }))
+  }
+
+  // Helper function to calculate activity streaks from session data
+  const calculateActivityStreaks = (sessions: any[]): { currentStreak: number; longestStreak: number } => {
+    if (!sessions || sessions.length === 0) {
+      return { currentStreak: 0, longestStreak: 0 }
+    }
+
+    // Group sessions by date (YYYY-MM-DD)
+    const sessionsByDate = sessions.reduce((acc, session) => {
+      const date = new Date(session.created_at).toISOString().split('T')[0]
+      if (!acc[date]) {
+        acc[date] = []
+      }
+      acc[date].push(session)
+      return acc
+    }, {} as Record<string, any[]>)
+
+    // Get unique dates and sort them
+    const uniqueDates = Object.keys(sessionsByDate).sort()
+    
+    if (uniqueDates.length === 0) {
+      return { currentStreak: 0, longestStreak: 0 }
+    }
+
+    let currentStreak = 0
+    let longestStreak = 0
+    let tempStreak = 1
+
+    // Calculate streaks
+    for (let i = 0; i < uniqueDates.length; i++) {
+      if (i > 0) {
+        const prevDate = new Date(uniqueDates[i - 1])
+        const currDate = new Date(uniqueDates[i])
+        const dayDiff = Math.floor((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
+        
+        if (dayDiff === 1) {
+          // Consecutive day
+          tempStreak++
+        } else {
+          // Streak broken
+          longestStreak = Math.max(longestStreak, tempStreak)
+          tempStreak = 1
+        }
+      }
+    }
+    
+    longestStreak = Math.max(longestStreak, tempStreak)
+
+    // Calculate current streak (from today backwards)
+    const today = new Date().toISOString().split('T')[0]
+    const mostRecentDate = uniqueDates[uniqueDates.length - 1]
+    
+    if (mostRecentDate === today) {
+      // User was active today, count backwards
+      currentStreak = 1
+      for (let i = uniqueDates.length - 2; i >= 0; i--) {
+        const prevDate = new Date(uniqueDates[i])
+        const nextDate = new Date(uniqueDates[i + 1])
+        const dayDiff = Math.floor((nextDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
+        
+        if (dayDiff === 1) {
+          currentStreak++
+        } else {
+          break
+        }
+      }
+    } else {
+      // Check if the most recent date was yesterday
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayStr = yesterday.toISOString().split('T')[0]
+      
+      if (mostRecentDate === yesterdayStr) {
+        // User was active yesterday, count backwards from yesterday
+        currentStreak = 1
+        for (let i = uniqueDates.length - 2; i >= 0; i--) {
+          const prevDate = new Date(uniqueDates[i])
+          const nextDate = new Date(uniqueDates[i + 1])
+          const dayDiff = Math.floor((nextDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
+          
+          if (dayDiff === 1) {
+            currentStreak++
+          } else {
+            break
+          }
+        }
+      } else {
+        // Streak is broken (no activity today or yesterday)
+        currentStreak = 0
+      }
+    }
+
+    return { currentStreak, longestStreak }
+  }
 
   const loadAchievements = useCallback(async (profile: UserProfile) => {
     const achievements: Achievement[] = [
@@ -521,21 +673,9 @@ export default function ProfilePage() {
 
   // Helper function to generate weekly activity
   const generateWeeklyActivity = (sessions: any[]): Array<{ day: string; sessions: number; timeSpent: number }> => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    
-    return days.map(day => {
-      const daySessions = sessions.filter(() => Math.random() > 0.5)
-      const dayTimeSpent = daySessions.reduce((sum, session) => {
-        const timeSpent = session.time_spent_seconds
-        return sum + (typeof timeSpent === 'number' ? timeSpent : 0)
-      }, 0)
-      
-      return {
-        day,
-        sessions: daySessions.length,
-        timeSpent: dayTimeSpent
-      }
-    })
+    // This function is now replaced by calculateWeeklyActivity above
+    // Keeping for backwards compatibility but not used
+    return []
   }
 
   const handleManualRefresh = useCallback(async () => {
@@ -934,7 +1074,7 @@ export default function ProfilePage() {
               </div>
 
               {/* Quick Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div className="bg-background-primary/30 rounded-lg p-3 border border-white/10">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-text-secondary">Member Since</span>
@@ -977,16 +1117,6 @@ export default function ProfilePage() {
                       Best: {sessionAnalytics.longestStreak} days
                     </p>
                   )}
-                </div>
-                
-                <div className="bg-background-primary/30 rounded-lg p-3 border border-white/10">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-text-secondary">Profile</span>
-                    <Target className="w-4 h-4 text-amber-400" />
-                  </div>
-                  <p className="font-semibold">
-                    {profileStats ? `${profileStats.profileCompleteness}%` : 'Loading...'}
-                  </p>
                 </div>
               </div>
             </div>
