@@ -19,22 +19,19 @@ import {
   Copy,
   Check,
   Download,
-  Share2,
   Settings,
   TrendingUp,
   BarChart3,
   Monitor,
   Eye,
   Award,
-  Target,
   Zap,
   ChevronDown,
   ChevronUp,
   Info,
   Star,
   Trophy,
-  Hash,
-  Link as LinkIcon
+  Hash
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { usePageTracking } from '@/hooks/usePageTracking'
@@ -83,7 +80,6 @@ interface ProfileStats {
   joinedDaysAgo: number
   loginStreak: number
   averageLoginInterval: number
-  profileCompleteness: number
   accessDuration: number
   trialDaysRemaining?: number
 }
@@ -106,7 +102,6 @@ export default function ProfilePage() {
   
   // UI State
   const [copiedDiscordId, setCopiedDiscordId] = useState(false)
-  const [copiedProfileUrl, setCopiedProfileUrl] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['overview']))
   const [showNotification, setShowNotification] = useState(false)
@@ -136,20 +131,10 @@ export default function ProfilePage() {
       joinedDaysAgo,
       loginStreak: Math.min(userProfile.login_count, 30),
       averageLoginInterval: joinedDaysAgo > 0 ? Math.round(joinedDaysAgo / Math.max(userProfile.login_count, 1)) : 0,
-      profileCompleteness: calculateProfileCompleteness(),
       accessDuration: calculateAccessDuration(),
       trialDaysRemaining
     }
   }, [userProfile])
-
-  function calculateProfileCompleteness(): number {
-    if (!userProfile) return 0
-    let completeness = 60
-    if (userProfile.username) completeness += 20
-    if (userProfile.last_login) completeness += 10
-    if (userProfile.login_count > 5) completeness += 10
-    return Math.min(completeness, 100)
-  }
 
   function calculateAccessDuration(): number {
     if (!userProfile) return 0
@@ -498,6 +483,9 @@ export default function ProfilePage() {
   }
 
   const loadAchievements = useCallback(async (profile: UserProfile) => {
+    // Calculate unique pages visited from session analytics
+    const uniquePagesVisited = sessionAnalytics ? sessionAnalytics.popularPages.length : 0
+
     const achievements: Achievement[] = [
       // Welcome Achievements
       {
@@ -646,25 +634,20 @@ export default function ProfilePage() {
           new Date(profile.trial_expiration) < new Date() : false
       },
       {
-        id: 'weekend_warrior',
-        title: 'Weekend Warrior',
-        description: 'Active on weekends',
-        icon: '🏖️',
-        unlocked: Math.random() > 0.5
-      },
-      {
         id: 'explorer',
         title: 'Explorer',
         description: 'Visit 5+ different pages',
         icon: '🗺️',
-        unlocked: Math.random() > 0.4
+        unlocked: uniquePagesVisited >= 5,
+        progress: Math.min(uniquePagesVisited, 5),
+        maxProgress: 5
       },
       {
         id: 'social_butterfly',
         title: 'Social Butterfly',
         description: 'Join our Discord community',
         icon: '💬',
-        unlocked: Math.random() > 0.3
+        unlocked: false // Set to false until Discord membership can be tracked
       }
     ]
     
@@ -700,15 +683,8 @@ export default function ProfilePage() {
   }, [userProfile?.discord_id])
 
   const copyProfileUrl = useCallback(async () => {
-    try {
-      const url = `${window.location.origin}/profile/${userProfile?.discord_id}`
-      await navigator.clipboard.writeText(url)
-      setCopiedProfileUrl(true)
-      setTimeout(() => setCopiedProfileUrl(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy profile URL:', err)
-    }
-  }, [userProfile?.discord_id])
+    // Function removed - no longer needed
+  }, [])
 
   const toggleSection = useCallback((section: string) => {
     setExpandedSections(prev => {
@@ -959,23 +935,6 @@ export default function ProfilePage() {
             >
               <Download className="w-4 h-4 mr-2" />
               Export Data
-            </Button>
-            <Button
-              onClick={copyProfileUrl}
-              variant="outline"
-              className="flex-1 lg:flex-none"
-            >
-              {copiedProfileUrl ? (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share Profile
-                </>
-              )}
             </Button>
             <Button
               onClick={handleManualRefresh}
@@ -1527,28 +1486,13 @@ export default function ProfilePage() {
                           </div>
                           
                           {userProfile.trial_expiration && (
-                            <div className="flex justify-between items-center py-2 border-b border-white/10">
+                            <div className="flex justify-between items-center py-2">
                               <span className="text-text-secondary">Trial Expires</span>
                               <span className="font-medium">
                                 {formatDate(userProfile.trial_expiration)}
                               </span>
                             </div>
                           )}
-                          
-                          <div className="flex justify-between items-center py-2">
-                            <span className="text-text-secondary">Profile Completeness</span>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-16 bg-white/10 rounded-full h-2">
-                                <div
-                                  className="bg-green-400 h-2 rounded-full transition-all duration-1000"
-                                  style={{ width: `${profileStats?.profileCompleteness || 0}%` }}
-                                />
-                              </div>
-                              <span className="font-medium text-sm">
-                                {profileStats?.profileCompleteness || 0}%
-                              </span>
-                            </div>
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -1565,24 +1509,6 @@ export default function ProfilePage() {
                         >
                           <Download className="w-4 h-4 mr-2" />
                           Export Data
-                        </Button>
-                        
-                        <Button
-                          onClick={copyProfileUrl}
-                          variant="outline"
-                          size="sm"
-                        >
-                          {copiedProfileUrl ? (
-                            <>
-                              <Check className="w-4 h-4 mr-2" />
-                              Profile Link Copied!
-                            </>
-                          ) : (
-                            <>
-                              <LinkIcon className="w-4 h-4 mr-2" />
-                              Copy Profile Link
-                            </>
-                          )}
                         </Button>
                         
                         {!hasAccess && (

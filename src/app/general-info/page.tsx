@@ -22,8 +22,33 @@ import {
   ShoppingCart,
   Award,
   Settings,
-  Plus
+  Plus,
+  Target,
+  Skull,
+  Truck,
+  CircleDot
 } from "lucide-react";
+
+// Custom Pickaxe Icon Component
+const PickaxeIcon = ({ className, ...props }: { className?: string; [key: string]: any }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999"/>
+    <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024"/>
+    <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069"/>
+    <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z"/>
+  </svg>
+);
+
+// Custom ID Card Icon Component
+const IdCardIcon = ({ className, ...props }: { className?: string; [key: string]: any }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M16 10h2"/>
+    <path d="M16 14h2"/>
+    <path d="M6.17 15a3 3 0 0 1 5.66 0"/>
+    <circle cx="9" cy="11" r="2"/>
+    <rect x="2" y="5" width="20" height="14" rx="2"/>
+  </svg>
+);
 
 // ===== TYPE DEFINITIONS =====
 
@@ -31,6 +56,7 @@ interface License {
   id: string;
   name: string;
   price: number | "Free";
+  sellPrice: number;
   icon: React.ComponentType<any>;
   description: string;
   category: "basic" | "intermediate" | "advanced" | "special";
@@ -57,7 +83,18 @@ interface FishItem {
   tier?: number;
 }
 
-type TabType = "licenses" | "vehicles" | "fishing" | "more";
+interface RebelItem {
+  id: string;
+  name: string;
+  price?: number;
+  sellPrice?: number;
+  icon: React.ComponentType<any>;
+  description: string;
+  category: "weapon" | "equipment" | "explosive" | "accessory";
+  isSelectable?: boolean;
+}
+
+type TabType = "licenses" | "vehicles" | "fishing" | "rebel" | "more";
 
 // ===== DATA DEFINITIONS =====
 
@@ -66,18 +103,20 @@ const licenses: License[] = [
     id: "coal",
     name: "Coal License",
     price: "Free",
-    icon: Hammer,
+    sellPrice: 32,
+    icon: PickaxeIcon,
     description: "Start your mining journey with basic coal extraction. Mine it, sell it, or use it in crafting. (Note: Coal cannot be processed further.)",
     category: "basic",
     rarity: "common",
-    isRecommended: false
+    isRecommended: true
   },
   {
     id: "sand",
     name: "Sand License",
     price: 5000,
+    sellPrice: 70,
     icon: Mountain,
-    description: "Extract valuable sand resources for construction and crafting.",
+    description: "Extract valuable sand resources for construction and crafting. Produces glass panes.",
     category: "basic",
     rarity: "common"
   },
@@ -85,8 +124,9 @@ const licenses: License[] = [
     id: "copper",
     name: "Copper License",
     price: 10000,
+    sellPrice: 90,
     icon: Wrench,
-    description: "Mine copper ore for advanced crafting and electrical components.",
+    description: "Mine copper ore for advanced crafting and electrical components. Produces copper bars.",
     category: "intermediate",
     rarity: "uncommon"
   },
@@ -94,8 +134,9 @@ const licenses: License[] = [
     id: "iron",
     name: "Iron License",
     price: 15000,
+    sellPrice: 120,
     icon: Shield,
-    description: "Access iron deposits for weapons, tools, and construction.",
+    description: "Access iron deposits for weapons, tools, and construction. Produces iron bars.",
     category: "intermediate",
     rarity: "uncommon"
   },
@@ -103,8 +144,9 @@ const licenses: License[] = [
     id: "cotton",
     name: "Cotton License",
     price: 20000,
+    sellPrice: 50,
     icon: Shirt,
-    description: "Cultivate cotton for textile production and clothing manufacturing.",
+    description: "Cultivate cotton for textile production and clothing manufacturing. Produces cloth sheets.",
     category: "intermediate",
     rarity: "uncommon"
   },
@@ -112,6 +154,7 @@ const licenses: License[] = [
     id: "diamond",
     name: "Diamond License",
     price: 50000,
+    sellPrice: 195,
     icon: Gem,
     description: "Mine the most precious gems for luxury crafting and trading.",
     category: "advanced",
@@ -121,8 +164,9 @@ const licenses: License[] = [
     id: "black-market",
     name: "Black Market License",
     price: 50000,
+    sellPrice: 0,
     icon: Eye,
-    description: "Access exclusive underground trading networks and illegal items.",
+    description: "Access exclusive underground trading networks and illegal items. Unlocks Rebel Outpost.",
     category: "special",
     rarity: "legendary"
   }
@@ -159,7 +203,7 @@ const vehicles: Vehicle[] = [
     price: 40000,
     description: "Heavy-duty vehicle for cargo and industrial operations.",
     category: "transport",
-    icon: Car
+    icon: Truck
   },
   {
     id: "toesucka",
@@ -176,18 +220,18 @@ const vehicles: Vehicle[] = [
     description: "Top-tier elite vehicle for the most discerning operators.",
     category: "premium",
     icon: Award
+  },
+  {
+    id: "lumperwhini",
+    name: "Lumperwhini",
+    price: 1200000,
+    description: "Ultra-premium exotic SUV with unmatched luxury and performance.",
+    category: "premium",
+    icon: Star
   }
 ];
 
 const fishingItems: FishItem[] = [
-  {
-    id: "boots",
-    name: "Boots",
-    price: 10,
-    type: "equipment",
-    description: "Basic fishing boots to keep your feet dry.",
-    icon: Shield
-  },
   {
     id: "fishing-rod-t1",
     name: "Fishing Rod T1",
@@ -216,9 +260,17 @@ const fishingItems: FishItem[] = [
     tier: 3
   },
   {
+    id: "boots",
+    name: "Boots",
+    price: 10,
+    type: "fish",
+    description: "Catchable item - Old boots found in the water.",
+    icon: CircleDot
+  },
+  {
     id: "carp-fish",
     name: "Carp Fish",
-    price: 30,
+    price: 65,
     type: "fish",
     description: "Common freshwater fish, good for beginners.",
     icon: Fish
@@ -226,7 +278,7 @@ const fishingItems: FishItem[] = [
   {
     id: "tuna-fish",
     name: "Tuna Fish",
-    price: 60,
+    price: 75,
     type: "fish",
     description: "Valuable ocean fish with high market demand.",
     icon: Fish
@@ -234,18 +286,126 @@ const fishingItems: FishItem[] = [
   {
     id: "shiny-fish",
     name: "Shiny Fish",
-    price: 120,
+    price: 150,
     type: "fish",
     description: "Rare sparkling fish that commands premium prices.",
-    icon: Star
+    icon: Fish
   },
   {
-    id: "turtle",
-    name: "Turtle",
-    price: 200,
+    id: "turtle-shell",
+    name: "Turtle Shell",
+    price: 235,
     type: "animal",
-    description: "Rare aquatic creature with high trading value.",
-    icon: Shield
+    description: "Rare turtle shell with high trading value.",
+    icon: Fish
+  }
+];
+
+const rebelItems: RebelItem[] = [
+  {
+    id: "c4-charge",
+    name: "C-4 Plastic Charge",
+    price: 40000,
+    icon: Target,
+    description: "High-explosive plastic charge for bank operations.",
+    category: "explosive"
+  },
+  {
+    id: "five-seven",
+    name: "Five seveN",
+    price: 5000,
+    icon: Zap,
+    description: "Compact tactical pistol with high stopping power.",
+    category: "weapon"
+  },
+  {
+    id: "five-seven-mag",
+    name: "Five seveN 20 rounds mag",
+    price: 80,
+    icon: Shield,
+    description: "Extended magazine for the Five seveN pistol.",
+    category: "accessory"
+  },
+  {
+    id: "g17",
+    name: "G17",
+    price: 50000,
+    icon: Zap,
+    description: "Professional grade service pistol.",
+    category: "weapon"
+  },
+  {
+    id: "g17-mag",
+    name: "G17 17 Round Mag",
+    price: 1000,
+    icon: Shield,
+    description: "Standard capacity magazine for G17 pistol.",
+    category: "accessory"
+  },
+  {
+    id: "gold-plating",
+    name: "Gold Plating Kit",
+    price: 50000,
+    icon: Star,
+    description: "Premium gold plating kit for weapon customization.",
+    category: "accessory"
+  },
+  {
+    id: "lockpick",
+    name: "Lockpick",
+    price: 1500,
+    icon: Wrench,
+    description: "Professional lockpicking tools for entry operations.",
+    category: "equipment"
+  },
+  {
+    id: "money-bag",
+    name: "Money Bag Sell",
+    sellPrice: 100000,
+    icon: DollarSign,
+    description: "High-value money bag for trading operations. This item cannot be purchased - only sold.",
+    category: "accessory",
+    isSelectable: true
+  },
+  {
+    id: "rp-radio",
+    name: "Roleplay Radio",
+    price: 15,
+    icon: Settings,
+    description: "Communication device for coordinated operations.",
+    category: "equipment"
+  },
+  {
+    id: "saltpeter",
+    name: "Saltpeter",
+    price: 20,
+    icon: Mountain,
+    description: "Chemical compound used in explosive manufacturing.",
+    category: "equipment"
+  },
+  {
+    id: "silver-plating",
+    name: "Silver Plating Kit",
+    price: 25000,
+    icon: Gem,
+    description: "Silver plating kit for weapon customization.",
+    category: "accessory"
+  },
+  {
+    id: "vault-drill",
+    name: "Vault Drill",
+    price: 5000,
+    icon: Settings,
+    description: "Specialized drilling equipment for vault operations.",
+    category: "equipment"
+  },
+  {
+    id: "zipties",
+    name: "Zipties",
+    price: 1500,
+    icon: AlertTriangle,
+    description: "Heavy-duty restraints for tactical operations.",
+    category: "equipment"
   }
 ];
 
@@ -258,7 +418,11 @@ const categoryColors = {
   special: "from-red-500/20 to-pink-500/20 border-red-500/30",
   transport: "from-blue-500/20 to-cyan-500/20 border-blue-500/30",
   rally: "from-orange-500/20 to-red-500/20 border-orange-500/30",
-  premium: "from-purple-500/20 to-violet-500/20 border-purple-500/30"
+  premium: "from-purple-500/20 to-violet-500/20 border-purple-500/30",
+  weapon: "from-red-500/20 to-orange-500/20 border-red-500/30",
+  equipment: "from-yellow-500/20 to-amber-500/20 border-yellow-500/30",
+  explosive: "from-red-600/20 to-red-700/20 border-red-600/40",
+  accessory: "from-gray-500/20 to-slate-500/20 border-gray-500/30"
 };
 
 const rarityColors = {
@@ -288,7 +452,7 @@ export default function GeneralInformationPage() {
     { 
       id: "licenses" as TabType, 
       label: "License Prices", 
-      icon: Hammer, 
+      icon: IdCardIcon, 
       count: licenses.length,
       description: "Mining and resource extraction permits"
     },
@@ -305,6 +469,13 @@ export default function GeneralInformationPage() {
       icon: Fish, 
       count: fishingItems.length,
       description: "Fishing equipment and marine life"
+    },
+    { 
+      id: "rebel" as TabType, 
+      label: "Rebel Outpost", 
+      icon: Skull, 
+      count: rebelItems.length,
+      description: "Black market weapons and equipment"
     },
     { 
       id: "more" as TabType, 
@@ -399,18 +570,18 @@ export default function GeneralInformationPage() {
               General <span className="gradient-text">Information</span>
             </h1>
             <p className="text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
-              Complete information hub for Narcos Life - All essential game data, prices, and guides in one convenient location.
+              Complete information hub for Narcos Life - All essential server data, prices, and information in one convenient location.
             </p>
           </motion.div>
 
           {/* Quick Stats */}
           <motion.div 
             variants={itemVariants}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-8"
+            className="grid grid-cols-2 md:grid-cols-5 gap-4 max-w-5xl mx-auto mb-8"
           >
             <div className="bg-white/5 backdrop-blur-sm border border-purple-500/20 rounded-xl p-4">
               <div className="flex items-center justify-center gap-2 text-green-400 mb-1">
-                <Hammer className="w-4 h-4" />
+                <IdCardIcon className="w-4 h-4" />
                 <span className="font-semibold">{licenses.length}</span>
               </div>
               <p className="text-white/60 text-sm">Licenses</p>
@@ -430,6 +601,13 @@ export default function GeneralInformationPage() {
               <p className="text-white/60 text-sm">Fish Items</p>
             </div>
             <div className="bg-white/5 backdrop-blur-sm border border-purple-500/20 rounded-xl p-4">
+              <div className="flex items-center justify-center gap-2 text-red-400 mb-1">
+                <Skull className="w-4 h-4" />
+                <span className="font-semibold">{rebelItems.length}</span>
+              </div>
+              <p className="text-white/60 text-sm">Rebel Items</p>
+            </div>
+            <div className="bg-white/5 backdrop-blur-sm border border-purple-500/20 rounded-xl p-4">
               <div className="flex items-center justify-center gap-2 text-amber-400 mb-1">
                 <Star className="w-4 h-4" />
                 <span className="font-semibold">∞</span>
@@ -447,7 +625,7 @@ export default function GeneralInformationPage() {
           className="mb-12"
         >
           <div className="bg-white/5 backdrop-blur-sm border border-purple-500/20 rounded-2xl p-2">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
               {tabs.map((tab) => {
                 const IconComponent = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -544,7 +722,7 @@ export default function GeneralInformationPage() {
                       {license.isRecommended && (
                         <div className="absolute -top-2 -right-2 bg-gradient-to-r from-green-500 to-emerald-500 
                           text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-                          Recommended
+                          Starter
                         </div>
                       )}
 
@@ -570,8 +748,8 @@ export default function GeneralInformationPage() {
                         </p>
 
                         <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                          <div>
-                            <span className="text-white/40 text-xs uppercase tracking-wide">Price</span>
+                          <div className="flex-1">
+                            <span className="text-white/40 text-xs uppercase tracking-wide">License Price</span>
                             <div className="flex items-center gap-1">
                               {license.price === "Free" ? (
                                 <span className="text-2xl font-bold text-green-400">Free</span>
@@ -582,6 +760,19 @@ export default function GeneralInformationPage() {
                               )}
                             </div>
                           </div>
+                          {license.sellPrice > 0 && (
+                            <div className="text-right">
+                              <span className="text-white/40 text-xs uppercase tracking-wide">Sell Price</span>
+                              <div className="text-lg font-bold text-green-400">
+                                ${license.sellPrice}
+                                {license.id === "coal" && <span className="text-xs">/bucket</span>}
+                                {license.id === "sand" && <span className="text-xs">/pane</span>}
+                                {license.id === "copper" && <span className="text-xs">/bar</span>}
+                                {license.id === "iron" && <span className="text-xs">/bar</span>}
+                                {license.id === "cotton" && <span className="text-xs">/sheet</span>}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </motion.div>
@@ -741,8 +932,8 @@ export default function GeneralInformationPage() {
                             <div className="p-3 rounded-xl bg-white/10 group-hover:bg-white/20 transition-colors">
                               <IconComponent className="w-6 h-6 text-white" aria-hidden="true" />
                             </div>
-                            <div className={`text-xs font-medium ${typeColors[item.type]} capitalize`}>
-                              {item.type}
+                            <div className="text-xs font-medium text-green-400 capitalize">
+                              Catchable
                             </div>
                           </div>
 
@@ -758,7 +949,7 @@ export default function GeneralInformationPage() {
                             <div className="flex items-center justify-between pt-3 border-t border-white/10">
                               <div>
                                 <span className="text-white/40 text-xs uppercase tracking-wide">Sell Price</span>
-                                <div className="text-2xl font-bold text-white">
+                                <div className="text-2xl font-bold text-green-400">
                                   ${item.price.toLocaleString()}
                                 </div>
                               </div>
@@ -769,6 +960,125 @@ export default function GeneralInformationPage() {
                     })}
                   </div>
                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Rebel Outpost Tab */}
+          {activeTab === "rebel" && (
+            <motion.div
+              key="rebel"
+              variants={tabContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <div className="mb-8 bg-red-500/10 border border-red-500/30 rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Eye className="w-8 h-8 text-red-400" />
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Rebel Outpost - Black Market</h2>
+                    <p className="text-red-200/70">Requires Black Market License to access</p>
+                  </div>
+                </div>
+                <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-red-200 text-sm mb-2">
+                        <strong>Important:</strong> Most items can be purchased here. Only Money Bags are sellable (cannot be bought).
+                      </p>
+                      <p className="text-red-200/70 text-xs">
+                        Access to this outpost is granted through the Black Market License ($50,000).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {rebelItems.map((item) => {
+                  const IconComponent = item.icon;
+                  
+                  return (
+                    <motion.div
+                      key={item.id}
+                      variants={cardVariants}
+                      whileHover="hover"
+                      className={`relative bg-gradient-to-br ${categoryColors[item.category]} 
+                        backdrop-blur-sm border rounded-2xl p-6 group cursor-pointer
+                        hover:shadow-2xl hover:shadow-red-500/10 transition-all duration-300`}
+                      role="article"
+                      aria-labelledby={`rebel-${item.id}-title`}
+                    >
+                      {item.isSelectable && (
+                        <div className="absolute -top-2 -right-2 bg-gradient-to-r from-green-500 to-emerald-500 
+                          text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                          Sellable
+                        </div>
+                      )}
+
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="p-3 rounded-xl bg-white/10 group-hover:bg-white/20 transition-colors">
+                          <IconComponent className="w-6 h-6 text-white" aria-hidden="true" />
+                        </div>
+                        <div className="text-xs font-medium text-red-400 capitalize">
+                          {item.category}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <h3 
+                          id={`rebel-${item.id}-title`}
+                          className="text-xl font-bold text-white group-hover:text-red-200 transition-colors"
+                        >
+                          {item.name}
+                        </h3>
+                        
+                        <p className="text-white/60 text-sm leading-relaxed">
+                          {item.description}
+                        </p>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                          {item.sellPrice && !item.price ? (
+                            // Only sell price for Money Bag
+                            <div className="w-full text-center">
+                              <span className="text-white/40 text-xs uppercase tracking-wide">Sell Price</span>
+                              <div className="text-2xl font-bold text-green-400">
+                                ${item.sellPrice.toLocaleString()}
+                              </div>
+                              <p className="text-white/50 text-xs mt-1">Cannot be purchased</p>
+                            </div>
+                          ) : item.price && item.sellPrice ? (
+                            // Both buy and sell price
+                            <>
+                              <div className="flex-1">
+                                <span className="text-white/40 text-xs uppercase tracking-wide">Buy Price</span>
+                                <div className="text-2xl font-bold text-white">
+                                  ${item.price.toLocaleString()}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-white/40 text-xs uppercase tracking-wide">Sell Price</span>
+                                <div className="text-lg font-bold text-green-400">
+                                  ${item.sellPrice.toLocaleString()}
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            // Only buy price
+                            <div>
+                              <span className="text-white/40 text-xs uppercase tracking-wide">Buy Price</span>
+                              <div className="text-2xl font-bold text-white">
+                                ${item.price?.toLocaleString()}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           )}
@@ -850,16 +1160,16 @@ export default function GeneralInformationPage() {
             </h2>
             <ul className="space-y-3 text-white/70" role="list">
               <li className="flex items-start gap-3">
+                <span className="text-red-400 mt-1">•</span>
+                <span>Added Rebel Outpost with complete black market pricing</span>
+              </li>
+              <li className="flex items-start gap-3">
                 <span className="text-green-400 mt-1">•</span>
-                <span>Added complete vehicle shop pricing data</span>
+                <span>Updated license pricing with material sell prices</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="text-blue-400 mt-1">•</span>
-                <span>Integrated fish trader information with equipment tiers</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-purple-400 mt-1">•</span>
-                <span>Enhanced license categorization and descriptions</span>
+                <span>Revised fishing trader with accurate catch values</span>
               </li>
             </ul>
           </div>
@@ -902,13 +1212,13 @@ export default function GeneralInformationPage() {
               </div>
               
               <div>
-                <h3 className="text-white font-semibold mb-1 text-sm">Vehicle Strategy</h3>
-                <p className="text-white/60 text-sm">Balance cost vs. functionality based on your current operations</p>
+                <h3 className="text-white font-semibold mb-1 text-sm">Black Market Access</h3>
+                <p className="text-white/60 text-sm">Black Market License unlocks the Rebel Outpost for advanced equipment</p>
               </div>
               
               <div>
                 <h3 className="text-white font-semibold mb-1 text-sm">Fishing ROI</h3>
-                <p className="text-white/60 text-sm">Invest in T2+ fishing rods for better profit margins</p>
+                <p className="text-white/60 text-sm">Invest in T2+ fishing rods for better profit margins on catches</p>
               </div>
             </div>
           </div>

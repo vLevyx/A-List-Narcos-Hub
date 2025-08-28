@@ -3,20 +3,46 @@
 import { DocumentationSection } from './DocumentationSection'
 import { FAQSection } from './FAQSection'
 
-// Define section data inside the client component to avoid passing functions
-const documentationData = [
-  {
-    id: "getting-started",
-    title: "Getting Started",
-    description: "Learn the basics of using A-List Hub",
-    iconName: "BookOpen",
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/10",
-    borderColor: "border-blue-500/20",
-    items: [
-      {
-        title: "Creating Your Account",
-        content: `Getting started with A-List Hub is simple and secure. Here's how to create your account:
+// ===== TYPE DEFINITIONS =====
+
+export interface DocumentationItem {
+  title: string;
+  content: string;
+}
+
+export interface DocumentationSectionData {
+  id: string;
+  title: string;
+  description: string;
+  iconName: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  items: DocumentationItem[];
+}
+
+export interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+// ===== DOCUMENTATION DATA =====
+
+/**
+ * Getting Started Section - Basic setup and authentication
+ */
+const GETTING_STARTED_SECTION: DocumentationSectionData = {
+  id: "getting-started",
+  title: "Getting Started",
+  description: "Learn the basics of using A-List Hub",
+  iconName: "BookOpen",
+  color: "text-blue-400",
+  bgColor: "bg-blue-500/10",
+  borderColor: "border-blue-500/20",
+  items: [
+    {
+      title: "Creating Your Account",
+      content: `Getting started with A-List Hub is simple and secure. Here's how to create your account:
 
 **Step 1: Discord Authentication**
 - Click "Login with Discord" on the homepage
@@ -34,10 +60,10 @@ const documentationData = [
 - Personalized experience across all tools
 
 **Security Note:** We only access your basic Discord profile information (username, avatar, ID, email). We never access any other Discord account data.`
-      },
-      {
-        title: "Discord Integration",
-        content: `A-List Hub integrates seamlessly with Discord to provide the best experience:
+    },
+    {
+      title: "Discord Integration",
+      content: `A-List Hub integrates seamlessly with Discord to provide the best experience:
 
 **Authentication Benefits:**
 - Single sign-on with your Discord account
@@ -63,10 +89,10 @@ If you experience login issues:
 2. Ensure your Discord account has a verified email address
 3. Try logging out of Discord and back in
 4. Contact support if issues persist`
-      },
-      {
-        title: "Understanding the Whitelist",
-        content: `Our whitelist system ensures quality and maintains a premium experience:
+    },
+    {
+      title: "Understanding the Whitelist",
+      content: `Our whitelist system ensures quality and maintains a premium experience:
 
 **What is the Whitelist?**
 The whitelist is our premium system that grants access to premium features and tools. It helps us maintain a high-quality community and ensure our advanced features are used responsibly.
@@ -83,10 +109,10 @@ The whitelist is our premium system that grants access to premium features and t
 
 **Trial System:**
 New users may request temporary trial access to experience premium features before full whitelist approval.`
-      },
-      {
-        title: "First Steps Guide",
-        content: `Once you're set up, here's how to make the most of A-List Hub:
+    },
+    {
+      title: "First Steps Guide",
+      content: `Once you're set up, here's how to make the most of A-List Hub:
 
 **1. Explore the Dashboard**
 - Familiarize yourself with the navigation menu
@@ -106,21 +132,25 @@ New users may request temporary trial access to experience premium features befo
 - Join community events for exclusive content
 - Follow our Discord announcements for updates
 - Provide feedback to help us improve`
-      }
-    ]
-  },
-  {
-    id: "tools-features",
-    title: "Tools & Features",
-    description: "Comprehensive guide to all available tools",
-    iconName: "Zap",
-    color: "text-purple-400",
-    bgColor: "bg-purple-500/10",
-    borderColor: "border-purple-500/20",
-    items: [
-      {
-        title: "Crafting Calculator",
-        content: `Our advanced crafting calculator helps you plan and optimize your crafting operations:
+    }
+  ]
+};
+
+/**
+ * Tools & Features Section - Platform functionality guide
+ */
+const TOOLS_FEATURES_SECTION: DocumentationSectionData = {
+  id: "tools-features",
+  title: "Tools & Features",
+  description: "Comprehensive guide to all available tools",
+  iconName: "Zap",
+  color: "text-purple-400",
+  bgColor: "bg-purple-500/10",
+  borderColor: "border-purple-500/20",
+  items: [
+    {
+      title: "Crafting Calculator",
+      content: `Our advanced crafting calculator helps you plan and optimize your crafting operations:
 
 **Key Features:**
 - Complete database of all craftable items
@@ -155,10 +185,10 @@ New users may request temporary trial access to experience premium features befo
 - Always check material chains for efficiency
 - Plan bulk crafting to optimize time
 - Track your progress with the built-in calculator`
-      },
-      {
-        title: "Vehicle Information System",
-        content: `Complete vehicle database with detailed specifications:
+    },
+    {
+      title: "Vehicle Information System",
+      content: `Complete vehicle database with detailed specifications:
 
 **Vehicle Categories:**
 - Cars
@@ -169,22 +199,26 @@ New users may request temporary trial access to experience premium features befo
 - Price ranges
 
 **Updates:**
-Our vehicle database is constantly updated with new additions, balance changes, and community feedback to ensure accuracy and completeness.`
-      },
-    ]
-  },
-  {
-    id: "community",
-    title: "Community & Support",
-    description: "Connect with other players and get help",
-    iconName: "Users",
-    color: "text-green-400",
-    bgColor: "bg-green-500/10",
-    borderColor: "border-green-500/20",
-    items: [
-      {
-        title: "Discord Community Guidelines",
-        content: `Our Discord community is the heart of A-List Hub. Here are our guidelines:
+Our vehicle database updated with new server additions to ensure accuracy and completeness.`
+    }
+  ]
+};
+
+/**
+ * Community & Support Section - Help and community guidelines
+ */
+const COMMUNITY_SUPPORT_SECTION: DocumentationSectionData = {
+  id: "community",
+  title: "Community & Support",
+  description: "Connect with other players and get help",
+  iconName: "Users",
+  color: "text-green-400",
+  bgColor: "bg-green-500/10",
+  borderColor: "border-green-500/20",
+  items: [
+    {
+      title: "Discord Community Guidelines",
+      content: `Our Discord community is the heart of A-List Hub. Here are our guidelines:
 
 **Core Principles:**
 - Respect all community members
@@ -195,43 +229,27 @@ Our vehicle database is constantly updated with new additions, balance changes, 
 
 **Channel Structure:**
 - **#general** - Main community discussion
-- **#support** - Technical help and questions
-- **#feedback** - Suggestions and feature requests
+- **#hub-support** - Technical help and questions
+- **#suggestions** - Suggestions and feature requests
 - **#announcements** - Important updates and news
-- **#tools-discussion** - Calculator and tool discussions
-
-**Moderation:**
-- Warnings for minor infractions
-- Temporary mutes for repeated violations
-- Kicks for serious violations
-- Permanent bans for extreme cases
-- Appeal process available for all actions
-
-**Reporting:**
-- Use Discord's built-in reporting system
-- Contact moderators directly for urgent issues
-- Provide evidence when possible
-- Follow up on your reports if necessary
 
 **Community Events:**
 - Regular community challenges
 - Tool showcases and tutorials
-- Q&A sessions with developers
 - Beta testing opportunities`
-      },
-      {
-        title: "Getting Support",
-        content: `We're here to help! Here's how to get the support you need:
+    },
+    {
+      title: "Getting Support",
+      content: `We're here to help! Here's how to get the support you need:
 
 **Support Channels:**
 1. **Discord Community** - Fastest response for general questions
 2. **Support Tickets** - For technical issues and account problems
-3. **Documentation** - Comprehensive guides and tutorials
+3. **Documentation** - Complete Guides and tutorials
 4. **FAQ Section** - Common questions and answers
 
 **Before Requesting Support:**
 - Check this documentation first
-- Search Discord for similar questions
 - Try basic troubleshooting steps
 - Gather relevant error messages or screenshots
 
@@ -243,24 +261,23 @@ Our vehicle database is constantly updated with new additions, balance changes, 
 - When the issue first occurred
 
 **Response Times:**
-- Discord community: Usually within 1-2 hours
 - Support tickets: 24-48 hours
 - Complex technical issues: 3-5 business days
 - Feature requests: Reviewed weekly
 
 **Emergency Support:**
-For critical issues affecting platform availability or security, contact administrators directly through Discord with @Admin ping.`
-      },
-      {
-        title: "Feature Requests & Feedback",
-        content: `Your feedback drives our development! Here's how to contribute:
+For critical issues affecting platform availability or security, contact administrators directly through Discord with @Staff Team ping.`
+    },
+    {
+      title: "Feature Requests & Feedback",
+      content: `Your feedback drives our development! Here's how to contribute:
 
 **Submitting Feature Requests:**
 1. Check if the feature already exists or is planned
 2. Describe the feature clearly and in detail
 3. Explain the use case and benefits
 4. Provide examples or mockups if possible
-5. Submit through Discord #feedback channel or support ticket
+5. Submit through Discord #suggestions channel or support ticket
 
 **Feedback Categories:**
 - **New Features** - Completely new functionality
@@ -278,16 +295,11 @@ For critical issues affecting platform availability or security, contact adminis
 
 **Community Voting:**
 - Popular requests get community voting opportunities
-- High-voted features receive priority consideration
-- Community involvement in feature prioritization
-- Regular polls and surveys for direction
-
-**Recognition:**
-Contributors of valuable feedback and suggestions receive community recognition and special roles.`
-      },
-      {
-        title: "Reporting Issues & Bugs",
-        content: `Help us maintain a quality platform by reporting issues effectively:
+- High-voted features receive priority consideration`
+    },
+    {
+      title: "Reporting Issues & Bugs",
+      content: `Help us maintain a quality platform by reporting issues effectively:
 
 **Types of Issues:**
 - **Critical Bugs** - Platform unavailable or major functionality broken
@@ -300,7 +312,7 @@ Contributors of valuable feedback and suggestions receive community recognition 
 1. **Immediate Action** - Take screenshots of the issue
 2. **Reproduce** - Try to recreate the problem
 3. **Document** - Note exact steps that caused the issue
-4. **Report** - Submit through Discord #support or support ticket
+4. **Report** - Submit through Discord #hub-support or support ticket
 5. **Follow Up** - Provide additional information if requested
 
 **What to Include:**
@@ -319,25 +331,29 @@ Contributors of valuable feedback and suggestions receive community recognition 
 
 **Rewards:**
 Users who report significant bugs or security issues may receive recognition and rewards within the community.`
-      }
-    ]
-  },
-  {
-    id: "security-privacy",
-    title: "Security & Privacy",
-    description: "Understanding our security measures and your privacy",
-    iconName: "Shield",
-    color: "text-red-400",
-    bgColor: "bg-red-500/10",
-    borderColor: "border-red-500/20",
-    items: [
-      {
-        title: "Data Protection & Privacy",
-        content: `Your privacy and data security are our top priorities:
+    }
+  ]
+};
+
+/**
+ * Security & Privacy Section - Data protection and security measures
+ */
+const SECURITY_PRIVACY_SECTION: DocumentationSectionData = {
+  id: "security-privacy",
+  title: "Security & Privacy",
+  description: "Understanding our security measures and your privacy",
+  iconName: "Shield",
+  color: "text-red-400",
+  bgColor: "bg-red-500/10",
+  borderColor: "border-red-500/20",
+  items: [
+    {
+      title: "Data Protection & Privacy",
+      content: `Your privacy and data security are our top priorities:
 
 **Data Collection:**
 We collect only essential information needed to provide our services:
-- Discord profile information (username, ID, avatar)
+- Discord profile information (username, ID, avatar, email)
 - Usage analytics for platform improvement
 - Preferences and settings
 - Communication logs for support purposes
@@ -364,15 +380,15 @@ We collect only essential information needed to provide our services:
 **Data Retention:**
 - Account data retained while account is active
 - Analytics data retained for 2 years maximum
-- Support logs retained for 1 year
+- Support logs retained for up-to 1 year
 - Immediate deletion upon account closure request
 
 **Contact:**
-For privacy concerns or data requests, contact our privacy team through Discord or support ticket.`
-      },
-      {
-        title: "Account Security Best Practices",
-        content: `Protect your account with these security best practices:
+For privacy concerns or data requests, contact our team through Discord or support ticket.`
+    },
+    {
+      title: "Account Security Best Practices",
+      content: `Protect your account with these security best practices:
 
 **Discord Account Security:**
 - Enable Two-Factor Authentication (2FA) on Discord
@@ -389,7 +405,7 @@ For privacy concerns or data requests, contact our privacy team through Discord 
 - Don't share your account with others
 
 **Phishing Protection:**
-- Always verify you're on the official A-List Hub domain
+- Always verify you're on the official A-List Hub website
 - Never enter your Discord credentials on suspicious sites
 - Be wary of fake Discord bots or impersonators
 - Official communication comes only from verified sources
@@ -408,10 +424,10 @@ Signs that your account may be compromised:
 3. Re-authorize with Discord using new credentials
 4. Contact our support team immediately
 5. Review all account activity`
-      },
-      {
-        title: "Platform Security Measures",
-        content: `Our comprehensive security infrastructure protects your data:
+    },
+    {
+      title: "Platform Security Measures",
+      content: `Our comprehensive security infrastructure protects your data:
 
 **Infrastructure Security:**
 - Enterprise-grade cloud hosting with 99.9% uptime
@@ -450,17 +466,15 @@ Signs that your account may be compromised:
 
 **Transparency:**
 We maintain transparency about our security practices while protecting sensitive implementation details.`
-      },
-      {
-        title: "Privacy Controls & Settings",
-        content: `Take control of your privacy with our comprehensive settings:
+    },
+    {
+      title: "Privacy Controls & Settings",
+      content: `Take control of your privacy with our comprehensive settings:
 
 **Profile Privacy:**
 - Control visibility of your profile information
-- Manage what data is shared with other users
 - Configure Discord integration level
 - Set communication preferences
-- Control data sharing with third parties
 
 **Data Management:**
 - Download your personal data at any time
@@ -470,34 +484,37 @@ We maintain transparency about our security practices while protecting sensitive
 - Manage data retention preferences
 
 **Communication Controls:**
-- Email notification preferences
 - Discord notification settings
-- Marketing communication opt-out
-- Support communication preferences
 - Community interaction controls
-
-**Analytics Opt-Out:**
-- Disable usage analytics collection
-- Opt out of performance monitoring
-- Control error reporting
-- Manage behavioral analytics
-- Set cookie preferences
 
 **Account Deletion:**
 - Complete account deletion process
 - Data deletion timeline and procedures
 - What data is retained and why
 - Recovery period and options
-- Confirmation and verification steps
 
 **Regular Privacy Reviews:**
 We recommend reviewing your privacy settings regularly and staying informed about updates to our privacy policy and terms of service.`
-      }
-    ]
-  }
-]
+    }
+  ]
+};
 
-const faqData = [
+/**
+ * Consolidated documentation sections array
+ */
+const DOCUMENTATION_SECTIONS: DocumentationSectionData[] = [
+  GETTING_STARTED_SECTION,
+  TOOLS_FEATURES_SECTION,
+  COMMUNITY_SUPPORT_SECTION,
+  SECURITY_PRIVACY_SECTION
+];
+
+// ===== FAQ DATA =====
+
+/**
+ * Frequently Asked Questions data
+ */
+const FAQ_DATA: FAQItem[] = [
   {
     question: "What is A-List Hub and how does it work?",
     answer: "A-List Hub is a premium platform providing advanced tools and resources for Narcos Life players. We offer calculators, guides, and community features to enhance your experience. The platform integrates with Discord for authentication and community features, providing a seamless and secure experience."
@@ -530,14 +547,14 @@ const faqData = [
     question: "How often are the tools and databases updated?",
     answer: "Our tools and databases are updated regularly to ensure accuracy and completeness. Crafting recipes and prices are updated as Narcos server changes occur, typically within 24-48 hours of official updates. Community feedback helps us identify areas that need updates quickly."
   }
-]
+];
 
 export function DocumentationContainer() {
   return (
     <>
       {/* Documentation Sections with Accordions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
-        {documentationData.map((section) => (
+        {DOCUMENTATION_SECTIONS.map((section) => (
           <DocumentationSection
             key={section.id}
             section={section}
@@ -546,7 +563,7 @@ export function DocumentationContainer() {
       </div>
 
       {/* FAQ Section */}
-      <FAQSection faqs={faqData} />
+      <FAQSection faqs={FAQ_DATA} />
     </>
   )
 }
