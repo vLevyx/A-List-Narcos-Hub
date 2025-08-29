@@ -17,30 +17,63 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: 'A-List Hub',
-  description: 'Everything you need for Narcos Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
-  keywords: 'Narcos Life, gaming tools, crafting calculator, price planner, weapon compatibility',
+  description: 'Everything you need for Narcos Life',
+  keywords: 'Narcos Life, gaming tools, crafting calculator',
   authors: [{ name: 'Levy' }],
   creator: 'The A-List Team',
+  
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon-16x16.png',
-    apple: '/apple-touch-icon.png',
+    // Primary favicon with multiple sizes for optimal performance
+    icon: [
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon.ico', sizes: '32x32' }, // Fallback ICO
+    ],
+    
+    // Apple touch icons for iOS home screen
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    
+    // Shortcut for older browsers
+    shortcut: '/favicon.ico',
   },
+
+  // Web App Manifest for PWA capabilities and better mobile experience
+  manifest: '/site.webmanifest',
+  
+  // Enhanced OpenGraph with proper images
   openGraph: {
     title: 'A-List Hub',
     description: 'Premium gaming tools for Narcos Life players',
     type: 'website',
     locale: 'en_US',
+    images: [
+      {
+        url: '/android-chrome-512x512.png',
+        width: 512,
+        height: 512,
+        alt: 'A-List Hub Logo',
+      },
+    ],
   },
+  
+  // Enhanced Twitter/X metadata
   twitter: {
     card: 'summary_large_image',
     title: 'A-List Hub',
     description: 'Premium gaming tools for Narcos Life players',
+    images: ['/android-chrome-512x512.png'],
   },
+  
   robots: {
     index: true,
     follow: true,
   },
+
+  // Additional metadata for better SEO
+  category: 'Gaming Tools',
+  applicationName: 'A-List Hub',
 }
 
 export const viewport: Viewport = {
@@ -59,9 +92,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={outfit.variable} suppressHydrationWarning>
       <head>
-        {/* Only keep DNS prefetch for performance - remove the manual font link */}
+        {/* Performance optimizations */}
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+        
+        {/* Optional: Preload critical favicon for faster loading */}
+        <link rel="preload" href="/favicon-32x32.png" as="image" type="image/png" />
       </head>
       <body
         className={`${outfit.className} min-h-screen bg-gradient-to-br from-background-primary via-background-secondary to-background-primary`}

@@ -246,7 +246,6 @@ export default function ProfilePage() {
 
       setUserProfile(profileData)
       await loadSessionAnalytics(discordId)
-      await loadAchievements(profileData)
       setDataLoadedOnce(true)
 
       if (forceRefresh) {
@@ -343,6 +342,13 @@ export default function ProfilePage() {
       console.error('Error loading session analytics:', error)
     }
   }, [supabase])
+
+  // Load achievements after session analytics is available
+  useEffect(() => {
+    if (userProfile && sessionAnalytics) {
+      loadAchievements(userProfile)
+    }
+  }, [userProfile, sessionAnalytics]) // Removed loadAchievements from deps
 
   // Helper function to calculate actual weekly activity from sessions
   const calculateWeeklyActivity = (sessions: any[]): Array<{ day: string; sessions: number; timeSpent: number }> => {
@@ -483,8 +489,38 @@ export default function ProfilePage() {
   }
 
   const loadAchievements = useCallback(async (profile: UserProfile) => {
+    // Wait for sessionAnalytics to be loaded before calculating achievements
+    if (!sessionAnalytics) return
+
     // Calculate unique pages visited from session analytics
-    const uniquePagesVisited = sessionAnalytics ? sessionAnalytics.popularPages.length : 0
+    const uniquePagesVisited = sessionAnalytics.popularPages.length
+
+    // Get the first time user visited the profile page from sessions
+    const getProfileVisitDate = async () => {
+      try {
+        const { data: profileSessions, error } = await supabase
+          .from('page_sessions')
+          .select('created_at')
+          .eq('discord_id', profile.discord_id)
+          .eq('page_path', '/profile')
+          .order('created_at', { ascending: true })
+          .limit(1)
+
+        if (error) {
+          console.error('Error fetching profile visit date:', error)
+          return new Date().toISOString()
+        }
+
+        return profileSessions && profileSessions.length > 0 
+          ? profileSessions[0].created_at 
+          : new Date().toISOString()
+      } catch (error) {
+        console.error('Error getting profile visit date:', error)
+        return new Date().toISOString()
+      }
+    }
+
+    const profileVisitDate = await getProfileVisitDate()
 
     const achievements: Achievement[] = [
       // Welcome Achievements
@@ -501,8 +537,8 @@ export default function ProfilePage() {
         title: 'Profile Explorer',
         description: 'Visit your profile page',
         icon: '👤',
-        unlocked: true,
-        unlockedAt: new Date().toISOString()
+        unlocked: true, // Always unlocked since they're viewing the profile page
+        unlockedAt: profileVisitDate
       },
       
       // Activity Achievements
@@ -543,14 +579,14 @@ export default function ProfilePage() {
         maxProgress: 100
       },
       
-      // Streak Achievements
+      // Streak Achievements - Use current sessionAnalytics data
       {
         id: 'streak_starter',
         title: 'Streak Starter',
         description: 'Maintain a 3-day activity streak',
         icon: '🔥',
-        unlocked: sessionAnalytics ? sessionAnalytics.longestStreak >= 3 : false,
-        progress: sessionAnalytics ? Math.min(sessionAnalytics.longestStreak, 3) : 0,
+        unlocked: sessionAnalytics.longestStreak >= 3,
+        progress: Math.min(sessionAnalytics.longestStreak, 3),
         maxProgress: 3
       },
       {
@@ -558,8 +594,8 @@ export default function ProfilePage() {
         title: 'Streak Master',
         description: 'Maintain a 7-day activity streak',
         icon: '⚡',
-        unlocked: sessionAnalytics ? sessionAnalytics.longestStreak >= 7 : false,
-        progress: sessionAnalytics ? Math.min(sessionAnalytics.longestStreak, 7) : 0,
+        unlocked: sessionAnalytics.longestStreak >= 7,
+        progress: Math.min(sessionAnalytics.longestStreak, 7),
         maxProgress: 7
       },
       {
@@ -567,8 +603,8 @@ export default function ProfilePage() {
         title: 'Unstoppable',
         description: 'Maintain a 30-day activity streak',
         icon: '🚀',
-        unlocked: sessionAnalytics ? sessionAnalytics.longestStreak >= 30 : false,
-        progress: sessionAnalytics ? Math.min(sessionAnalytics.longestStreak, 30) : 0,
+        unlocked: sessionAnalytics.longestStreak >= 30,
+        progress: Math.min(sessionAnalytics.longestStreak, 30),
         maxProgress: 30
       },
       
@@ -652,7 +688,7 @@ export default function ProfilePage() {
     ]
     
     setAchievements(achievements)
-  }, [sessionAnalytics])
+  }, [sessionAnalytics, supabase])
 
   // Helper function to generate weekly activity
   const generateWeeklyActivity = (sessions: any[]): Array<{ day: string; sessions: number; timeSpent: number }> => {
@@ -665,6 +701,13 @@ export default function ProfilePage() {
     setDataLoadedOnce(false)
     await fetchProfile(true)
   }, [fetchProfile])
+
+  // Load achievements after session analytics is available
+  useEffect(() => {
+    if (userProfile && sessionAnalytics) {
+      loadAchievements(userProfile)
+    }
+  }, [userProfile, sessionAnalytics, loadAchievements])
 
   // ====================================
   // UI INTERACTION HANDLERS

@@ -11,10 +11,17 @@ import { CopyLinkButton } from "@/components/ui/CopyLinkButton";
 import { ReferralSelector } from "@/components/ui/ReferralSelector";
 
 // Configuration
-const DISCOUNT_ENABLED = false;
 const ORIGINAL_PRICE = 250000;
-const DISCOUNT_RATE = 0.15;
+const DISCOUNT_RATE = 0.30;
 const DISCOUNTED_PRICE = ORIGINAL_PRICE * (1 - DISCOUNT_RATE);
+
+// Launch Sale Configuration
+const SALE_START = new Date('2025-08-30T00:00:00Z');
+const SALE_END = new Date('2025-09-15T23:59:59Z');
+const DISCOUNT_ENABLED = (() => {
+  const now = new Date();
+  return now >= SALE_START && now <= SALE_END;
+})();
 
 interface UserStatus {
   type:
@@ -419,6 +426,176 @@ const handleSubmit = useCallback(
     );
   };
 
+  // Launch Sale Banner Component
+const LaunchSaleBanner = () => {
+  const [timeLeft, setTimeLeft] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+  } | null>(null);
+
+  const [saleStatus, setSaleStatus] = useState<'upcoming' | 'active' | 'ended'>('ended');
+
+  useEffect(() => {
+    const updateSaleCountdown = () => {
+      const now = new Date();
+      
+      if (now < SALE_START) {
+        // Sale hasn't started yet
+        setSaleStatus('upcoming');
+        const diff = SALE_START.getTime() - now.getTime();
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft({ days, hours, minutes, seconds });
+      } else if (now >= SALE_START && now <= SALE_END) {
+        // Sale is active
+        setSaleStatus('active');
+        const diff = SALE_END.getTime() - now.getTime();
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft({ days, hours, minutes, seconds });
+      } else {
+        // Sale has ended
+        setSaleStatus('ended');
+        setTimeLeft(null);
+      }
+    };
+
+    updateSaleCountdown();
+    const timer = setInterval(updateSaleCountdown, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  if (saleStatus === 'ended') return null;
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', { 
+      month: 'long', 
+      day: 'numeric',
+      timeZone: 'UTC'
+    });
+  };
+
+  return (
+    <div className="w-full max-w-4xl mx-auto mb-8 animate-fade-in-up">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 p-1">
+        <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 animate-pulse"></div>
+        <div className="relative bg-black/90 backdrop-blur-xl rounded-[22px] p-4 sm:p-6 lg:p-8">
+          {/* Sale Header */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-500/30 rounded-full px-4 py-2 mb-4">
+              <span className="text-2xl animate-bounce">🔥</span>
+              <span className="text-red-300 font-bold text-sm sm:text-base uppercase tracking-wider">
+                Launch Sale
+              </span>
+            </div>
+            
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black mb-2 bg-gradient-to-r from-red-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+              LIMITED TIME OFFER
+            </h2>
+            
+            <p className="text-white/80 text-base sm:text-lg">
+              {saleStatus === 'upcoming' 
+                ? `Sale starts ${formatDate(SALE_START)}`
+                : `Sale ends ${formatDate(SALE_END)}`
+              }
+            </p>
+          </div>
+
+          {/* Countdown Timer */}
+{timeLeft && (
+  <div className="mb-6">
+    {/* Mobile: 2x2 grid */}
+    <div className="grid grid-cols-2 gap-2 sm:hidden mb-4">
+      {[
+        { label: 'Days', value: timeLeft.days },
+        { label: 'Hours', value: timeLeft.hours }
+      ].map((item) => (
+        <div 
+          key={item.label}
+          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-lg p-2 text-center"
+        >
+          <div className="text-lg font-black text-white mb-1">
+            {item.value.toString().padStart(2, '0')}
+          </div>
+          <div className="text-xs text-white/70 font-medium uppercase tracking-wider">
+            {item.label}
+          </div>
+        </div>
+      ))}
+    </div>
+    <div className="grid grid-cols-2 gap-2 sm:hidden">
+      {[
+        { label: 'Minutes', value: timeLeft.minutes },
+        { label: 'Seconds', value: timeLeft.seconds }
+      ].map((item) => (
+        <div 
+          key={item.label}
+          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-lg p-2 text-center"
+        >
+          <div className="text-lg font-black text-white mb-1">
+            {item.value.toString().padStart(2, '0')}
+          </div>
+          <div className="text-xs text-white/70 font-medium uppercase tracking-wider">
+            {item.label}
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Tablet and Desktop: Single row */}
+    <div className="hidden sm:grid sm:grid-cols-4 gap-3 md:gap-4">
+      {[
+        { label: 'Days', value: timeLeft.days },
+        { label: 'Hours', value: timeLeft.hours },
+        { label: 'Minutes', value: timeLeft.minutes },
+        { label: 'Seconds', value: timeLeft.seconds }
+      ].map((item) => (
+        <div 
+          key={item.label}
+          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-3 md:p-4 text-center"
+        >
+          <div className="text-xl md:text-2xl lg:text-3xl font-black text-white mb-1">
+            {item.value.toString().padStart(2, '0')}
+          </div>
+          <div className="text-xs md:text-sm text-white/70 font-medium uppercase tracking-wider">
+            {item.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+          {/* Sale Message */}
+          <div className="text-center">
+            <div className="inline-flex items-center gap-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-2xl px-6 py-4">
+              <span className="text-3xl">💰</span>
+              <div>
+                <div className="text-xl sm:text-2xl font-bold text-green-300">
+                  Save 30% During Launch Week!
+                </div>
+                <div className="text-green-400/80 text-sm sm:text-base">
+                  {saleStatus === 'upcoming' 
+                    ? 'Get ready for massive savings!'
+                    : 'Don\'t miss out on this exclusive offer!'
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
   // Status message component
   const StatusMessage = ({ status }: { status: UserStatus }) => {
     const messages = {
@@ -798,8 +975,11 @@ const handleSubmit = useCallback(
             </p>
           </div>
 
-          {/* Main Card */}
-          <div className="w-full max-w-4xl glass-card rounded-3xl overflow-hidden shadow-2xl animate-fade-in-up-delayed">
+          {/* Launch Sale Banner */}
+<LaunchSaleBanner />
+
+{/* Main Card */}
+<div className="w-full max-w-4xl glass-card rounded-3xl overflow-hidden shadow-2xl animate-fade-in-up-delayed">
             {/* Gradient border effect */}
             <div className="relative p-1 bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 rounded-3xl">
               <div className="bg-black/80 backdrop-blur-xl rounded-[22px] p-4 sm:p-6 md:p-8 lg:p-12">
@@ -856,8 +1036,8 @@ const handleSubmit = useCallback(
             ${DISCOUNTED_PRICE.toLocaleString()}
           </div>
           <span className="inline-block bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-semibold px-2 py-1 sm:px-3 sm:py-1 rounded-full mt-2 animate-bounce">
-            15% OFF
-          </span>
+  🔥 LAUNCH SALE - 30% OFF
+</span>
         </div>
       )}
     </div>

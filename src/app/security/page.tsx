@@ -1,12 +1,12 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { 
-  Shield, 
-  Lock, 
-  Eye, 
-  Server, 
-  ExternalLink, 
-  CheckCircle, 
+import {
+  Shield,
+  Lock,
+  Eye,
+  Server,
+  ExternalLink,
+  CheckCircle,
   AlertTriangle,
   Key,
   Database,
@@ -16,160 +16,198 @@ import {
 
 export const metadata: Metadata = {
   title: 'Security | A-List Hub',
-  description: 'Learn about A-List Hub\'s comprehensive security measures, data protection protocols, and how we keep your information safe.',
-  keywords: 'security, data protection, encryption, authentication, A-List Hub, narcos life',
+  description:
+    "Learn about A-List Hub's security measures, data protection protocols, and how we keep your information safe.",
+  keywords: 'security, data protection, encryption, authentication, A-List Hub',
   openGraph: {
     title: 'Security | A-List Hub',
-    description: 'Learn about A-List Hub\'s comprehensive security measures and data protection protocols.',
-    type: 'website',
+    description:
+      'Learn about A-List Hub’s comprehensive security measures and data protection protocols.',
+    type: 'website'
   },
   robots: {
     index: true,
-    follow: true,
-  },
+    follow: true
+  }
 }
 
 export default function SecurityPage() {
-  const lastUpdated = "August 3, 2025"
+  const lastUpdated = 'August 28, 2025'
+  const lastInternalReview = 'August 2025'
 
   const securityFeatures = [
     {
-      title: "Discord OAuth 2.0 Authentication",
-      description: "Secure authentication without password storage using industry-standard OAuth 2.0 protocols",
+      title: 'Discord OAuth 2.0 Authentication',
+      description:
+        'Secure authentication via Discord OAuth2 (no password storage). Scopes: identify, email. We request the minimum necessary.',
       icon: Key,
-      color: "text-blue-400",
-      bgColor: "bg-blue-500/10",
-      borderColor: "border-blue-500/20"
+      color: 'text-blue-400',
+      bgColor: 'bg-blue-500/10',
+      borderColor: 'border-blue-500/20'
     },
     {
-      title: "End-to-End Encryption",
-      description: "All data transmitted between your device and our servers is encrypted using TLS 1.3",
+      title: 'Encryption in Transit (TLS)',
+      description:
+        'All traffic is protected with HTTPS (TLS 1.2/1.3) between your device, our edge (Vercel), and our database (Supabase).',
       icon: Lock,
-      color: "text-green-400",
-      bgColor: "bg-green-500/10",
-      borderColor: "border-green-500/20"
+      color: 'text-green-400',
+      bgColor: 'bg-green-500/10',
+      borderColor: 'border-green-500/20'
     },
     {
-      title: "Database Security",
-      description: "PostgreSQL with row-level security policies and encrypted storage at rest",
+      title: 'Database Security',
+      description:
+        'PostgreSQL with Row-Level Security (RLS) and AES-256 encryption at rest.',
       icon: Database,
-      color: "text-purple-400",
-      bgColor: "bg-purple-500/10",
-      borderColor: "border-purple-500/20"
+      color: 'text-purple-400',
+      bgColor: 'bg-purple-500/10',
+      borderColor: 'border-purple-500/20'
     },
     {
-      title: "Infrastructure Security",
-      description: "Hosted on Vercel and Supabase with enterprise-grade security and monitoring",
+      title: 'Infrastructure Security',
+      description:
+        'Hosted on Vercel and Supabase—both SOC 2 Type II—within a shared-responsibility model.',
       icon: Server,
-      color: "text-orange-400",
-      bgColor: "bg-orange-500/10",
-      borderColor: "border-orange-500/20"
+      color: 'text-orange-400',
+      bgColor: 'bg-orange-500/10',
+      borderColor: 'border-orange-500/20'
     },
     {
-      title: "Real-time Monitoring",
-      description: "24/7 monitoring for suspicious activities, security threats, and performance issues",
-      icon: Eye,
-      color: "text-red-400",
-      bgColor: "bg-red-500/10",
-      borderColor: "border-red-500/20"
+      title: 'Security Headers',
+      description:
+        'Strict security headers (CSP, HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-Frame-Options).',
+      icon: Shield,
+      color: 'text-indigo-400',
+      bgColor: 'bg-indigo-500/10',
+      borderColor: 'border-indigo-500/20'
     },
     {
-      title: "Rate Limiting",
-      description: "Advanced rate limiting and DDoS protection to prevent abuse and ensure availability",
+      title: 'DDoS Mitigation & Rate Limiting',
+      description:
+        'Vercel provides automatic DDoS mitigation; we enforce per-IP and per-user rate limits on auth and write endpoints via Vercel WAF.',
       icon: Zap,
-      color: "text-yellow-400",
-      bgColor: "bg-yellow-500/10",
-      borderColor: "border-yellow-500/20"
+      color: 'text-yellow-400',
+      bgColor: 'bg-yellow-500/10',
+      borderColor: 'border-yellow-500/20'
+    },
+    {
+      title: 'Continuous Monitoring',
+      description:
+        'Continuous monitoring and alerting across app and providers; documented incident response procedures.',
+      icon: Eye,
+      color: 'text-red-400',
+      bgColor: 'bg-red-500/10',
+      borderColor: 'border-red-500/20'
+    },
+    {
+      title: 'Secrets Management',
+      description:
+        'Secrets stored as encrypted environment variables (Vercel/Supabase). Rotation on role change and at regular intervals.',
+      icon: Lock,
+      color: 'text-emerald-400',
+      bgColor: 'bg-emerald-500/10',
+      borderColor: 'border-emerald-500/20'
+    },
+    {
+      title: 'Data Governance',
+      description:
+        'Primary data region per Supabase project settings; automated backups and defined retention. Point-in-time recovery if enabled.',
+      icon: Globe,
+      color: 'text-cyan-400',
+      bgColor: 'bg-cyan-500/10',
+      borderColor: 'border-cyan-500/20'
     }
   ]
 
   const complianceStandards = [
     {
-      title: "OWASP Top 10",
-      description: "Regular security audits following OWASP guidelines",
-      status: "Compliant"
+      title: 'OWASP Top 10',
+      description:
+        'We follow OWASP Top 10 secure-coding practices and security guidelines.',
+      status: 'Practiced'
     },
     {
-      title: "SOC 2 Type II",
-      description: "Infrastructure providers maintain SOC 2 compliance",
-      status: "Inherited"
+      title: 'SOC 2 Type II',
+      description: 'Compliance inherited from our cloud infrastructure providers.',
+      status: 'Inherited (Vercel & Supabase)'
     },
     {
-      title: "GDPR",
-      description: "European data protection regulation compliance",
-      status: "Compliant"
+      title: 'GDPR',
+      description: 'Data Processing Addendum (DPA) available; see Privacy Policy.',
+      status: 'Aligned'
     },
     {
-      title: "CCPA",
-      description: "California Consumer Privacy Act compliance",
-      status: "Compliant"
+      title: 'CCPA',
+      description: 'See Privacy Policy.',
+      status: 'Aligned'
     }
   ]
 
   const securityPractices = [
     {
-      title: "Data Minimization",
+      title: 'Data Minimization',
       practices: [
-        "We collect only the minimum data necessary for service operation",
-        "Regular data audits to remove unnecessary information",
-        "Automatic data purging for inactive accounts",
-        "User-controlled data retention preferences"
+        'We collect only the minimum data necessary for service operation',
+        'Regular data audits to remove unnecessary information',
+        'Automatic data purging for inactive accounts',
+        'User-controlled data retention preferences'
       ]
     },
     {
-      title: "Access Controls",
+      title: 'Access Controls',
       practices: [
-        "Role-based access control (RBAC) for all system components",
-        "Multi-factor authentication for administrative access",
-        "Principle of least privilege for all user accounts",
-        "Regular access reviews and permission audits"
+        'Role-based access control (RBAC) for all system components',
+        'Multi-factor authentication for administrative access',
+        'Principle of least privilege for all user accounts',
+        'Regular access reviews and permission audits'
       ]
     },
     {
-      title: "Incident Response",
+      title: 'Incident Response',
       practices: [
-        "24/7 security monitoring and alerting systems",
-        "Documented incident response procedures",
-        "Automated threat detection and response",
-        "Regular security incident simulation exercises"
+        'Continuous monitoring and alerting',
+        'Documented incident response procedures',
+        'Automated threat detection and response',
+        'Regular security incident simulation exercises'
       ]
     },
     {
-      title: "Code Security",
+      title: 'Code Security',
       practices: [
-        "Static application security testing (SAST) in CI/CD pipeline",
-        "Dependency vulnerability scanning and updates",
-        "Secure coding practices and peer code reviews",
-        "Regular penetration testing by third-party experts"
+        'Static application security testing (SAST) in CI/CD pipeline',
+        'Dependency vulnerability scanning and updates',
+        'Secure coding practices and peer code reviews',
+        'Periodic third-party security assessments and scans'
       ]
     }
   ]
 
   const reportingProcess = [
     {
-      step: "1. Identify the Issue",
-      description: "Document the security concern with as much detail as possible",
-      icon: "🔍"
+      step: '1. Identify the Issue',
+      description: 'Document the security concern with as much detail as possible',
+      icon: '🔍'
     },
     {
-      step: "2. Report Through Discord",
-      description: "Contact our security team through the official Discord support channels",
-      icon: "📞"
+      step: '2. Report Through Discord',
+      description:
+        'Contact our team via our official Discord support channels to report the issue.',
+      icon: '📞'
     },
     {
-      step: "3. Initial Response",
+      step: '3. Initial Response',
       description: "We'll acknowledge your report within 24 hours and begin investigation",
-      icon: "⏰"
+      icon: '⏰'
     },
     {
-      step: "4. Investigation & Fix",
-      description: "Our team will investigate and implement fixes for confirmed issues",
-      icon: "🔧"
+      step: '4. Investigation & Fix',
+      description: 'Our team will investigate and implement fixes for confirmed issues',
+      icon: '🔧'
     },
     {
-      step: "5. Follow-up",
+      step: '5. Follow-up',
       description: "We'll keep you informed of progress and resolution status",
-      icon: "✅"
+      icon: '✅'
     }
   ]
 
@@ -188,61 +226,68 @@ export default function SecurityPage() {
             <Shield className="w-5 h-5 text-red-400" />
             <span className="text-red-300 font-semibold">Security</span>
           </div>
-          
+
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
             Security & Protection
           </h1>
           <p className="text-xl text-white/80 max-w-3xl mx-auto mb-4">
             Your security is our top priority. Learn about the comprehensive measures we implement to protect your data and ensure platform integrity.
           </p>
-          <p className="text-text-secondary">
-            Last Updated: {lastUpdated}
-          </p>
+          <p className="text-text-secondary">Last Updated: {lastUpdated}</p>
         </div>
 
-        {/* Security Status */}
+        {/* Security Status Banner */}
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-6 mb-16">
-          <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse flex-shrink-0"></div>
               <div>
-                <h3 className="text-green-400 font-semibold">All Systems Secure</h3>
+                <h3 className="text-green-400 font-semibold">All Systems Operational</h3>
                 <p className="text-text-secondary text-sm">
-                  No known security incidents. Last security audit: July 2025
+                  Operational. Last internal security review: {lastInternalReview}. We also track provider status.
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-green-400" />
-                <span className="text-green-400">99.9% Uptime</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-blue-400" />
-                <span className="text-blue-400">256-bit Encryption</span>
-              </div>
+
+            <div className="flex items-center gap-4 text-sm">
+              <a
+                href="https://www.vercel-status.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 underline text-green-400"
+              >
+                <Globe className="w-4 h-4" />
+                Vercel Status
+              </a>
+              <a
+                href="https://status.supabase.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 underline text-green-400"
+              >
+                <Globe className="w-4 h-4" />
+                Supabase Status
+              </a>
             </div>
           </div>
         </div>
 
         {/* Security Features */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-white mb-8 text-center">Security Features</h2>
+          <h2 className="text-3xl font-bold text-white mb-8 text-center">Core Security Features</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {securityFeatures.map((feature, index) => {
               const IconComponent = feature.icon
               return (
                 <div
                   key={index}
-                  className={`${feature.bgColor} ${feature.borderColor} border rounded-xl p-6 hover:bg-opacity-80 transition-all duration-300`}
+                  className={`${feature.bgColor} ${feature.borderColor} border rounded-xl p-6 hover:bg-opacity-80 transition-all duration-300 flex flex-col`}
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <IconComponent className={`w-8 h-8 ${feature.color}`} />
                     <h3 className="text-lg font-semibold text-white">{feature.title}</h3>
                   </div>
-                  <p className="text-text-secondary text-sm leading-relaxed">
-                    {feature.description}
-                  </p>
+                  <p className="text-text-secondary text-sm leading-relaxed">{feature.description}</p>
                 </div>
               )
             })}
@@ -257,16 +302,21 @@ export default function SecurityPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {complianceStandards.map((standard, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg">
+              <div
+                key={index}
+                className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-lg"
+              >
                 <div>
                   <h3 className="text-white font-semibold mb-1">{standard.title}</h3>
                   <p className="text-text-secondary text-sm">{standard.description}</p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  standard.status === 'Compliant' 
-                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                }`}>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium text-center ${
+                    standard.status.startsWith('Inherited')
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      : 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  }`}
+                >
                   {standard.status}
                 </span>
               </div>
@@ -276,10 +326,13 @@ export default function SecurityPage() {
 
         {/* Security Practices */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-white mb-8 text-center">Security Practices</h2>
+          <h2 className="text-3xl font-bold text-white mb-8 text-center">Our Security Practices</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {securityPractices.map((category, index) => (
-              <div key={index} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
+              <div
+                key={index}
+                className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6"
+              >
                 <h3 className="text-xl font-semibold text-white mb-4">{category.title}</h3>
                 <ul className="space-y-3">
                   {category.practices.map((practice, pIndex) => (
@@ -295,19 +348,17 @@ export default function SecurityPage() {
         </div>
 
         {/* Security Reporting */}
-<div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 mb-16">
-  <div className="text-center mb-8">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center sm:gap-3 items-center mb-4">
-      <AlertTriangle className="w-6 h-6 text-orange-400 mb-2 sm:mb-0" />
-      <h2 className="text-2xl font-bold text-white">
-        Security Issue Reporting
-      </h2>
-    </div>
-    <p className="text-text-secondary max-w-2xl mx-auto">
-      Found a security vulnerability? We appreciate responsible disclosure and will work with you to resolve any issues quickly and safely.
-    </p>
-  </div>
-          
+        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 mb-16">
+          <div className="text-center mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center sm:gap-3 items-center mb-4">
+              <AlertTriangle className="w-6 h-6 text-orange-400 mb-2 sm:mb-0" />
+              <h2 className="text-2xl font-bold text-white">Security Issue Reporting</h2>
+            </div>
+            <p className="text-text-secondary max-w-2xl mx-auto">
+              Found a security vulnerability? Report it to us and we’ll work with you to resolve it quickly and safely.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {reportingProcess.map((step, index) => (
               <div key={index} className="text-center">
@@ -319,7 +370,7 @@ export default function SecurityPage() {
               </div>
             ))}
           </div>
-          
+
           <div className="text-center mt-8">
             <a
               href="https://discord.gg/9HaxJmPSpH"
@@ -327,7 +378,7 @@ export default function SecurityPage() {
               rel="noopener noreferrer"
               className="btn-primary px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2"
             >
-              Report Security Issue
+              Report via Discord
               <ExternalLink className="w-4 h-4" />
             </a>
           </div>
@@ -347,7 +398,7 @@ export default function SecurityPage() {
               Learn how we collect, use, and protect your personal information.
             </p>
           </Link>
-          
+
           <Link
             href="/terms"
             className="p-6 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-all duration-300 group"
@@ -375,13 +426,10 @@ export default function SecurityPage() {
               rel="noopener noreferrer"
               className="btn-primary px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2"
             >
-              Contact Security Team
+              Contact via Discord
               <ExternalLink className="w-4 h-4" />
             </a>
-            <Link
-              href="/docs"
-              className="btn-outline px-6 py-3 rounded-lg font-semibold"
-            >
+            <Link href="/docs" className="btn-outline px-6 py-3 rounded-lg font-semibold">
               View Documentation
             </Link>
           </div>

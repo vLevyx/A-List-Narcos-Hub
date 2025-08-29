@@ -37,6 +37,7 @@ interface CalculationResults {
   totalXP: number;
   craftingLevel: number;
   requiresRecipe?: boolean;
+  recipeRequirements: CraftingRequirement[]; // New field for recipe/blueprint requirements
 }
 
 interface CraftingSettings {
@@ -71,8 +72,12 @@ const ResourceItem = ({
   progress?: { required: number; collected: number; completed: boolean };
   onProgressChange?: (resource: string, collected: number) => void;
 }) => {
-  const tag = getItemTag(resource);
-  const tagColors = getTagColors(tag);
+  // Handle special case for recipe/blueprint items
+const isRecipeItem = resource.includes('Recipe/Blueprint');
+const tag = isRecipeItem ? 'Recipe' as ItemTag : getItemTag(resource);
+const tagColors = isRecipeItem 
+  ? { bg: "bg-red-500/20", text: "text-red-300", border: "border-red-500/30" }
+  : getTagColors(tag);
   
   const handleProgressClick = () => {
     if (!progress || !onProgressChange) return;
@@ -418,17 +423,27 @@ export default function NarcosCalculatorPage() {
       const totalTime = calculateFinalItemTime(selectedItem, quantity);
       const totalXP = calculateFinalItemXP(selectedItem, quantity);
       
-      setResults({
-        item: selectedItem,
-        quantity,
-        directRequirements,
-        subDirectRequirements,
-        baseResources,
-        totalTime,
-        totalXP,
-        craftingLevel: recipe?.craftingLevel || 0,
-        requiresRecipe: recipe?.requiresRecipe || false
-      });
+      // Calculate recipe requirements if needed
+const recipeRequirements: CraftingRequirement[] = [];
+if (recipe?.requiresRecipe) {
+  recipeRequirements.push({ 
+    item: `${selectedItem} Recipe/Blueprint`, 
+    quantity: 1 
+  });
+}
+
+setResults({
+  item: selectedItem,
+  quantity,
+  directRequirements,
+  subDirectRequirements,
+  baseResources,
+  totalTime,
+  totalXP,
+  craftingLevel: recipe?.craftingLevel || 0,
+  requiresRecipe: recipe?.requiresRecipe || false,
+  recipeRequirements
+});
       
       // Initialize progress tracking
       const newProgress: ProgressTracker = {};
@@ -598,7 +613,7 @@ export default function NarcosCalculatorPage() {
                                 </span>
                               )}
                               {item.requiresRecipe && (
-                                <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded">
+                                <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-300 rounded">
                                   Recipe Required
                                 </span>
                               )}
@@ -762,7 +777,7 @@ export default function NarcosCalculatorPage() {
                         </span>
                       )}
                       {results.requiresRecipe && (
-                        <span className="flex items-center gap-2 text-amber-400">
+                        <span className="flex items-center gap-2 text-red-400">
                           <AlertCircle className="w-4 h-4" />
                           Requires Recipe/Blueprint
                         </span>
@@ -826,13 +841,35 @@ export default function NarcosCalculatorPage() {
                     )}
                   </div>
 
-                  {/* Stage 3: Direct Requirements */}
-                  <div className="mb-8">
-                    <h2 className="text-xl font-semibold border-b border-purple-600 pb-2 mb-4 text-purple-300 flex items-center gap-2">
-                      <span className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
-                      Direct Requirements
-                    </h2>
-                    <p className="text-gray-400 text-sm mb-4">Items you need in your inventory for the final craft</p>
+                  {/* Recipe Requirements (if needed) */}
+{results.recipeRequirements.length > 0 && (
+  <div className="mb-8">
+    <h2 className="text-xl font-semibold border-b border-red-600 pb-2 mb-4 text-red-300 flex items-center gap-2">
+  <span className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">!</span>
+  Recipe/Blueprint Required
+</h2>
+    <p className="text-gray-400 text-sm mb-4">You must have this recipe/blueprint in your inventory to craft this item</p>
+    
+    <div className="space-y-2">
+      {results.recipeRequirements.map((req, index) => (
+        <ResourceItem
+  key={index}
+  resource={req.item}
+  amount={req.quantity}
+  className="bg-red-500/10 border-red-500/30"
+/>
+      ))}
+    </div>
+  </div>
+)}
+
+{/* Stage 3: Direct Requirements */}
+<div className="mb-8">
+  <h2 className="text-xl font-semibold border-b border-purple-600 pb-2 mb-4 text-purple-300 flex items-center gap-2">
+    <span className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
+    Direct Requirements
+  </h2>
+  <p className="text-gray-400 text-sm mb-4">Items you need in your inventory for the final craft</p>
 
                     {results.directRequirements.length > 0 ? (
                       <div className="space-y-2">
@@ -941,29 +978,34 @@ export default function NarcosCalculatorPage() {
                   </div>
 
                   {/* Tag Legend */}
-                  <div className="mt-8">
-                    <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
-                      Material Type Legend
-                    </h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
-                        <div className="text-emerald-300 font-bold mb-1">Gatherable</div>
-                        <div className="text-xs text-gray-400">Materials you can mine/gather from the world</div>
-                      </div>
-                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
-                        <div className="text-blue-300 font-bold mb-1">Processed</div>
-                        <div className="text-xs text-gray-400">Materials processed from gathered resources</div>
-                      </div>
-                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-center">
-                        <div className="text-amber-300 font-bold mb-1">Lootable</div>
-                        <div className="text-xs text-gray-400">Items from Cartel Shipments or Chemical Trucks</div>
-                      </div>
-                      <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 text-center">
-                        <div className="text-purple-300 font-bold mb-1">Craftable</div>
-                        <div className="text-xs text-gray-400">Items that must be crafted at workbenches</div>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Tag Legend */}
+<div className="mt-8">
+  <h2 className="text-xl font-semibold border-b border-gray-600 pb-2 mb-4" style={{ color: PURPLE_PRIMARY }}>
+    Material Type Legend
+  </h2>
+  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
+      <div className="text-emerald-300 font-bold mb-1">Gatherable</div>
+      <div className="text-xs text-gray-400">Materials you can mine/gather from the world</div>
+    </div>
+    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
+      <div className="text-blue-300 font-bold mb-1">Processed</div>
+      <div className="text-xs text-gray-400">Materials processed from gathered resources</div>
+    </div>
+    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-center">
+      <div className="text-amber-300 font-bold mb-1">Lootable</div>
+      <div className="text-xs text-gray-400">Items from Cartel Shipments or Chemical Trucks</div>
+    </div>
+    <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 text-center">
+      <div className="text-purple-300 font-bold mb-1">Craftable</div>
+      <div className="text-xs text-gray-400">Items that must be crafted at workbenches</div>
+    </div>
+    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center">
+  <div className="text-red-300 font-bold mb-1">Recipe</div>
+  <div className="text-xs text-gray-400">Recipe/Blueprint required in inventory</div>
+</div>
+  </div>
+</div>
 
                 </>
               )}

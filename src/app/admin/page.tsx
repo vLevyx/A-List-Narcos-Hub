@@ -1,3 +1,4 @@
+// Admin Page Baseline
 "use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -20,7 +21,8 @@ import {
   UserPlus,
   ChevronLeft,
   ChevronRight,
-  Activity
+  Activity,
+  Crown  // Add Crown icon for admin identification
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { usePageTracking } from '@/hooks/usePageTracking'
@@ -51,6 +53,7 @@ interface User {
 interface UserWithAccess extends User {
   hasAccess: boolean
   isTrialActive: boolean
+  isAdmin: boolean  // Add admin flag
 }
 
 interface AdminLog {
@@ -59,6 +62,7 @@ interface AdminLog {
   admin_name: string | null
   action: string | null
   target_discord_id: string | null
+  target_username: string | null  
   description: string | null
   created_at: string | null
 }
@@ -246,18 +250,17 @@ export default function AdminDashboard() {
         return {
           ...user,
           hasAccess,
-          isTrialActive: isTrialActive || false
+          isTrialActive: isTrialActive || false,
+          isAdmin: isUserAdmin  // Add admin flag
         }
       })
 
       setUsers(usersWithAccess)
       setDataLoadedOnce(true)
       
-      if (forceRefresh) {
-        setStatusMessage({
-          type: 'success',
-          message: `Refreshed ${usersWithAccess.length} users successfully`
-        })
+      // Only show messages for manual refreshes or errors
+      if (forceRefresh && lastManualRefresh && Date.now() - lastManualRefresh < 2000) {
+        console.log(`✅ Loaded ${usersWithAccess.length} users`)
       }
     } catch (error) {
       console.error('Error loading users:', error)
@@ -270,7 +273,7 @@ export default function AdminDashboard() {
     }
   }, [supabase, user, isAdmin, dataLoadedOnce, lastManualRefresh])
 
-  // Load logs with proper admin verification
+// Load logs with proper admin verification and username lookup
   const loadLogs = useCallback(async (page: number = 1, limit: number = 50, forceRefresh: boolean = false) => {
     if (!user || !isAdmin) {
       setStatusMessage({
@@ -295,24 +298,59 @@ export default function AdminDashboard() {
         throw new Error('Admin privileges required')
       }
       
-      const { data, error } = await supabase
+      // First get the logs
+      const { data: logsData, error: logsError } = await supabase
         .from('admin_logs')
         .select('*')
         .order('created_at', { ascending: false })
         .range((page - 1) * limit, page * limit - 1)
 
-      if (error) {
-        console.error('Logs query error:', error)
-        throw error
+      if (logsError) {
+        console.error('Logs query error:', logsError)
+        throw logsError
       }
 
-      setLogs(data || [])
+      // Get unique target discord IDs that aren't null
+      const targetDiscordIds = [...new Set(
+        (logsData || [])
+          .map(log => log.target_discord_id)
+          .filter(id => id !== null)
+      )] as string[]
+
+      // Fetch usernames for these discord IDs
+      let usernames: { [key: string]: string } = {}
       
-      if (forceRefresh) {
-        setStatusMessage({
-          type: 'success',
-          message: `Refreshed ${(data || []).length} log entries`
-        })
+      if (targetDiscordIds.length > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('discord_id, username')
+          .in('discord_id', targetDiscordIds)
+
+        if (usersError) {
+          console.warn('Warning: Could not fetch usernames for logs:', usersError)
+          // Don't throw error, just continue without usernames
+        } else {
+          // Create a map of discord_id -> username
+          usernames = (usersData || []).reduce((acc, user) => {
+            if (user.discord_id && user.username) {
+              acc[user.discord_id] = user.username
+            }
+            return acc
+          }, {} as { [key: string]: string })
+        }
+      }
+
+      // Enhance logs with usernames
+      const enhancedLogs: AdminLog[] = (logsData || []).map(log => ({
+        ...log,
+        target_username: log.target_discord_id ? usernames[log.target_discord_id] || null : null
+      }))
+
+      setLogs(enhancedLogs)
+      
+      // Only show messages for manual refreshes or errors
+      if (forceRefresh && lastManualRefresh && Date.now() - lastManualRefresh < 2000) {
+        console.log(`✅ Loaded ${enhancedLogs.length} log entries`)
       }
     } catch (error) {
       console.error('Error loading logs:', error)
@@ -325,28 +363,116 @@ export default function AdminDashboard() {
     }
   }, [supabase, user, isAdmin, dataLoadedOnce])
 
-  // Manual refresh function
+  // Manual refresh function - now just for fallback/force refresh
   const handleManualRefresh = useCallback(() => {
-    const now = Date.now()
-    setLastManualRefresh(now)
+    console.log('🔄 Manual refresh requested - reloading data...')
     setDataLoadedOnce(false) // Reset cache
     loadUsers(userPage, userLimit, userSearch, userStatusFilter, true)
     loadLogs(1, 50, true)
+    
+    setStatusMessage({
+      type: 'info',
+      message: 'Data refreshed manually'
+    })
   }, [loadUsers, loadLogs, userPage, userLimit, userSearch, userStatusFilter])
+
+// ====================================
+  // REAL-TIME DATA HELPERS
+  // ====================================
+
+// Helper to calculate user access status
+  const calculateUserAccess = useCallback((user: User) => {
+    const now = new Date()
+    const isTrialActive = user.hub_trial && 
+      user.trial_expiration && 
+      new Date(user.trial_expiration) > now
+    
+    const adminIds = process.env.NEXT_PUBLIC_ADMIN_IDS?.split(',') || []
+    const isUserAdmin = adminIds.includes(user.discord_id)
+    
+    const hasAccess = !user.revoked || isTrialActive || isUserAdmin
+
+    return {
+      ...user,
+      hasAccess,
+      isTrialActive: isTrialActive || false,
+      isAdmin: isUserAdmin  // Add admin flag
+    } as UserWithAccess
+  }, [])
+
+  // Helper to merge user changes into existing state
+  const mergeUserChange = useCallback((payload: any, eventType: string) => {
+    setUsers(currentUsers => {
+      const newUser = payload.new as User
+      const oldUser = payload.old as User
+      
+      switch (eventType) {
+        case 'INSERT':
+          // Add new user if not already present
+          const userExists = currentUsers.some(u => u.id === newUser.id)
+          if (!userExists) {
+            return [...currentUsers, calculateUserAccess(newUser)].sort((a, b) => 
+              new Date(b.last_login || 0).getTime() - new Date(a.last_login || 0).getTime()
+            )
+          }
+          return currentUsers
+          
+        case 'UPDATE':
+          // Update existing user
+          return currentUsers.map(user => 
+            user.id === newUser.id ? calculateUserAccess(newUser) : user
+          )
+          
+        case 'DELETE':
+          // Remove deleted user
+          return currentUsers.filter(user => user.id !== oldUser.id)
+          
+        default:
+          return currentUsers
+      }
+    })
+  }, [calculateUserAccess])
+
+  // Helper to merge log changes into existing state
+  const mergeLogChange = useCallback(async (payload: any, eventType: string) => {
+    if (eventType === 'INSERT') {
+      const newLog = payload.new as AdminLog
+      
+      // Get username for the target if available
+      let enhancedLog = { ...newLog, target_username: null }
+      
+      if (newLog.target_discord_id) {
+        try {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('username')
+            .eq('discord_id', newLog.target_discord_id)
+            .single()
+          
+          if (userData?.username) {
+            enhancedLog.target_username = userData.username
+          }
+        } catch (error) {
+          console.warn('Could not fetch username for log:', error)
+        }
+      }
+      
+      setLogs(currentLogs => [enhancedLog, ...currentLogs].slice(0, 50)) // Keep latest 50 logs
+    }
+  }, [supabase])
 
   // ====================================
   // REAL-TIME SUBSCRIPTIONS
   // ====================================
 
-  // Enhanced real-time subscriptions for immediate updates
   useEffect(() => {
     if (!isAdmin || !dataLoadedOnce) return
 
-    console.log('Setting up enhanced real-time subscriptions...')
+    console.log('🚀 Setting up seamless real-time subscriptions...')
 
-    // Users table subscription - triggers on ANY change to users table
+    // Users table subscription - no loading states, direct state updates
     const usersSubscription = supabase
-      .channel('users_realtime_changes')
+      .channel('admin_users_realtime')
       .on(
         'postgres_changes',
         {
@@ -355,33 +481,14 @@ export default function AdminDashboard() {
           table: 'users'
         },
         (payload) => {
-          console.log('🔥 Users table changed in real-time:', payload)
-          // Immediately reload users data
-          loadUsers(userPage, userLimit, userSearch, userStatusFilter, true)
+          mergeUserChange(payload, payload.eventType)
         }
       )
       .subscribe()
 
-    // Page sessions subscription - triggers when users go online/offline
-    const sessionsSubscription = supabase
-      .channel('sessions_realtime_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'page_sessions'
-        },
-        (payload) => {
-          console.log('🔥 Session changed in real-time:', payload)
-          // This will trigger the online status updates
-        }
-      )
-      .subscribe()
-
-    // Admin logs subscription
+    // Admin logs subscription - no loading states, direct state updates
     const logsSubscription = supabase
-      .channel('logs_realtime_changes')
+      .channel('admin_logs_realtime')
       .on(
         'postgres_changes',
         {
@@ -390,26 +497,35 @@ export default function AdminDashboard() {
           table: 'admin_logs'
         },
         (payload) => {
-          console.log('🔥 Admin logs changed in real-time:', payload)
-          loadLogs(1, 50, true)
+          mergeLogChange(payload, payload.eventType)
         }
       )
       .subscribe()
 
-    // Additional polling for users table every 10 seconds for immediate login detection
-    const usersPollingInterval = setInterval(() => {
-      console.log('🔄 Polling users table for new logins...')
-      loadUsers(userPage, userLimit, userSearch, userStatusFilter, true)
-    }, 10000) // Every 10 seconds
+    // Page sessions subscription for online status
+    const sessionsSubscription = supabase
+      .channel('admin_sessions_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'page_sessions'
+        },
+        (payload) => {
+          console.log('🌐 Session activity:', payload.eventType)
+          // The useRealtimeSessionMonitoring hook handles this
+        }
+      )
+      .subscribe()
 
     return () => {
-      console.log('🧹 Cleaning up real-time subscriptions...')
+      console.log('🧹 Cleaning up seamless real-time subscriptions...')
       supabase.removeChannel(usersSubscription)
-      supabase.removeChannel(sessionsSubscription)  
       supabase.removeChannel(logsSubscription)
-      clearInterval(usersPollingInterval)
+      supabase.removeChannel(sessionsSubscription)
     }
-  }, [isAdmin, dataLoadedOnce, loadUsers, loadLogs, userPage, userLimit, userSearch, userStatusFilter, supabase])
+  }, [isAdmin, dataLoadedOnce, supabase, mergeUserChange, mergeLogChange])
 
   // ====================================
   // SEARCH AND FILTER HANDLERS
@@ -470,13 +586,39 @@ export default function AdminDashboard() {
           throw new Error('Invalid action')
       }
 
+      // Optimistically update the user in the UI immediately
+      setUsers(currentUsers => 
+        currentUsers.map(user => {
+          if (user.discord_id === targetDiscordId) {
+            const updatedUser = { ...user }
+            switch (action) {
+              case 'whitelist':
+                updatedUser.revoked = false
+                break
+              case 'revoke':
+                updatedUser.revoked = true
+                break
+              case 'trial_7':
+              case 'trial_30':
+                updatedUser.hub_trial = true
+                const days = action === 'trial_7' ? 7 : 30
+                updatedUser.trial_expiration = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+                break
+            }
+            return calculateUserAccess(updatedUser)
+          }
+          return user
+        })
+      )
+
+      // Show subtle success notification (no layout shift)
       setStatusMessage({
         type: 'success',
-        message: `Successfully performed action: ${description}`
+        message: `${description} - changes will sync automatically`
       })
 
-      // Real-time subscription will handle the data refresh automatically
-      // No need to manually reload here
+      // Real-time subscription will handle the authoritative update
+      // This provides immediate feedback while ensuring data consistency
     } catch (error) {
       console.error('Error performing user action:', error)
       setStatusMessage({
@@ -772,9 +914,19 @@ export default function AdminDashboard() {
                                   </span>
                                 </div>
                                 <div>
-                                  <p className="font-medium text-white">
-                                    {user.username || 'Unknown User'}
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-white">
+                                      {user.username || 'Unknown User'}
+                                    </p>
+                                    {user.isAdmin && (
+                                      <span 
+                                        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                        title="Administrator"
+                                      >
+                                        <Crown className="w-3 h-3" />
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-sm text-white/60">
                                     ID: {user.discord_id}
                                   </p>
@@ -824,50 +976,58 @@ export default function AdminDashboard() {
                             </td>
                             <td className="p-4">
                               <div className="flex items-center gap-2">
-                                {!user.revoked && (
+                                {user.isAdmin ? (
+                                  <span className="text-xs text-amber-400/70 italic">
+                                    Protected Admin
+                                  </span>
+                                ) : (
                                   <>
+                                    {!user.revoked && (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => performUserAction(user.discord_id, 'trial_7')}
+                                          disabled={loadingState.action}
+                                          className="text-xs"
+                                        >
+                                          7d Trial
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => performUserAction(user.discord_id, 'trial_30')}
+                                          disabled={loadingState.action}
+                                          className="text-xs"
+                                        >
+                                          30d Trial
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => performUserAction(user.discord_id, 'whitelist')}
+                                          disabled={loadingState.action}
+                                          className="text-xs text-green-400 border-green-400/30 hover:bg-green-400/10"
+                                        >
+                                          <UserCheck className="w-3 h-3" />
+                                        </Button>
+                                      </>
+                                    )}
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      onClick={() => performUserAction(user.discord_id, 'trial_7')}
+                                      onClick={() => performUserAction(user.discord_id, user.revoked ? 'whitelist' : 'revoke')}
                                       disabled={loadingState.action}
-                                      className="text-xs"
+                                      className={`text-xs ${
+                                        user.revoked 
+                                          ? 'text-green-400 border-green-400/30 hover:bg-green-400/10'
+                                          : 'text-red-400 border-red-400/30 hover:bg-red-400/10'
+                                      }`}
                                     >
-                                      7d Trial
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => performUserAction(user.discord_id, 'trial_30')}
-                                      disabled={loadingState.action}
-                                      className="text-xs"
-                                    >
-                                      30d Trial
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => performUserAction(user.discord_id, 'whitelist')}
-                                      disabled={loadingState.action}
-                                      className="text-xs text-green-400 border-green-400/30 hover:bg-green-400/10"
-                                    >
-                                      <UserCheck className="w-3 h-3" />
+                                      {user.revoked ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
                                     </Button>
                                   </>
                                 )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => performUserAction(user.discord_id, user.revoked ? 'whitelist' : 'revoke')}
-                                  disabled={loadingState.action}
-                                  className={`text-xs ${
-                                    user.revoked 
-                                      ? 'text-green-400 border-green-400/30 hover:bg-green-400/10'
-                                      : 'text-red-400 border-red-400/30 hover:bg-red-400/10'
-                                  }`}
-                                >
-                                  {user.revoked ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
-                                </Button>
                               </div>
                             </td>
                           </tr>
@@ -908,10 +1068,18 @@ export default function AdminDashboard() {
                                 </span>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <p className="font-medium text-white text-sm truncate">
                                     {user.username || 'Unknown User'}
                                   </p>
+                                  {user.isAdmin && (
+                                    <span 
+                                      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      title="Administrator"
+                                    >
+                                      <Crown className="w-3 h-3" />
+                                    </span>
+                                  )}
                                   {onlineUsers.has(user.discord_id) && (
                                     <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full font-medium">
                                       Online
@@ -983,61 +1151,71 @@ export default function AdminDashboard() {
 
                             {/* Actions */}
                             <div className="flex flex-wrap gap-2">
-                              {!user.revoked && (
+                              {user.isAdmin ? (
+                                <div className="w-full text-center py-2">
+                                  <span className="text-xs text-amber-400/70 italic">
+                                    Protected Administrator Account
+                                  </span>
+                                </div>
+                              ) : (
                                 <>
+                                  {!user.revoked && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => performUserAction(user.discord_id, 'trial_7')}
+                                        disabled={loadingState.action}
+                                        className="text-xs px-3 py-1 h-auto"
+                                      >
+                                        7d Trial
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => performUserAction(user.discord_id, 'trial_30')}
+                                        disabled={loadingState.action}
+                                        className="text-xs px-3 py-1 h-auto"
+                                      >
+                                        30d Trial
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => performUserAction(user.discord_id, 'whitelist')}
+                                        disabled={loadingState.action}
+                                        className="text-xs text-green-400 border-green-400/30 hover:bg-green-400/10 px-3 py-1 h-auto"
+                                      >
+                                        <UserCheck className="w-3 h-3 mr-1" />
+                                        Grant Access
+                                      </Button>
+                                    </>
+                                  )}
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => performUserAction(user.discord_id, 'trial_7')}
+                                    onClick={() => performUserAction(user.discord_id, user.revoked ? 'whitelist' : 'revoke')}
                                     disabled={loadingState.action}
-                                    className="text-xs px-3 py-1 h-auto"
+                                    className={`text-xs px-3 py-1 h-auto ${
+                                      user.revoked 
+                                        ? 'text-green-400 border-green-400/30 hover:bg-green-400/10'
+                                        : 'text-red-400 border-red-400/30 hover:bg-red-400/10'
+                                    }`}
                                   >
-                                    7d Trial
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => performUserAction(user.discord_id, 'trial_30')}
-                                    disabled={loadingState.action}
-                                    className="text-xs px-3 py-1 h-auto"
-                                  >
-                                    30d Trial
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => performUserAction(user.discord_id, 'whitelist')}
-                                    disabled={loadingState.action}
-                                    className="text-xs text-green-400 border-green-400/30 hover:bg-green-400/10 px-3 py-1 h-auto"
-                                  >
-                                    <UserCheck className="w-3 h-3 mr-1" />
-                                    Grant Access
+                                    {user.revoked ? (
+                                      <>
+                                        <UserCheck className="w-3 h-3 mr-1" />
+                                        Restore
+                                      </>
+                                    ) : (
+                                      <>
+                                        <UserX className="w-3 h-3 mr-1" />
+                                        Revoke
+                                      </>
+                                    )}
                                   </Button>
                                 </>
                               )}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => performUserAction(user.discord_id, user.revoked ? 'whitelist' : 'revoke')}
-                                disabled={loadingState.action}
-                                className={`text-xs px-3 py-1 h-auto ${
-                                  user.revoked 
-                                    ? 'text-green-400 border-green-400/30 hover:bg-green-400/10'
-                                    : 'text-red-400 border-red-400/30 hover:bg-red-400/10'
-                                }`}
-                              >
-                                {user.revoked ? (
-                                  <>
-                                    <UserCheck className="w-3 h-3 mr-1" />
-                                    Restore
-                                  </>
-                                ) : (
-                                  <>
-                                    <UserX className="w-3 h-3 mr-1" />
-                                    Revoke
-                                  </>
-                                )}
-                              </Button>
                             </div>
                           </div>
                         ))}
@@ -1138,7 +1316,12 @@ export default function AdminDashboard() {
                                 </span>
                               </td>
                               <td className="p-4 text-white/80">
-                                {log.target_discord_id || 'N/A'}
+                                {log.target_username || log.target_discord_id || 'N/A'}
+                                {log.target_username && log.target_discord_id && (
+                                  <div className="text-xs text-white/40 mt-1">
+                                    ID: {log.target_discord_id}
+                                  </div>
+                                )}
                               </td>
                               <td className="p-4 text-white/80">
                                 {log.description || 'No description'}
@@ -1178,7 +1361,14 @@ export default function AdminDashboard() {
                               <div className="space-y-2 text-xs">
                                 <div>
                                   <span className="text-white/60">Target:</span>
-                                  <span className="ml-2 text-white/80">{log.target_discord_id || 'N/A'}</span>
+                                  <span className="ml-2 text-white/80">
+                                    {log.target_username || log.target_discord_id || 'N/A'}
+                                  </span>
+                                  {log.target_username && log.target_discord_id && (
+                                    <div className="text-xs text-white/40 mt-1">
+                                      ID: {log.target_discord_id}
+                                    </div>
+                                  )}
                                 </div>
                                 <div>
                                   <span className="text-white/60">Description:</span>

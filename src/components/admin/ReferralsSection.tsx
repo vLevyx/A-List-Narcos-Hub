@@ -474,7 +474,7 @@ export function ReferralsSection() {
                         <td className="p-4">
                           <div>
                             <p className="text-sm font-bold text-yellow-400">
-                              ELAN${(stat.premium_conversions * 250000).toLocaleString()}
+                              N${(stat.premium_conversions * 250000).toLocaleString()}
                             </p>
                             <p className="text-xs text-white/50">
                               (10% × {stat.premium_conversions} conversions)
