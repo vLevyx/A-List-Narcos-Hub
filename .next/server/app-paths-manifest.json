@@ -1,7 +1,4 @@
 {
   "/page": "app/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/whitelist/page": "app/whitelist/page.js",
-  "/calculator/page": "app/calculator/page.js",
-  "/profile/page": "app/profile/page.js"
+  "/calculator/page": "app/calculator/page.js"
 }

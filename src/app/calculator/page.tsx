@@ -94,28 +94,32 @@ const tagColors = isRecipeItem
   
   return (
     <div className={`flex justify-between items-center p-3 rounded-lg ${tagColors.bg} border ${tagColors.border} ${className} ${progress?.completed ? 'opacity-75' : ''}`}>
-      <div className="flex items-center gap-2 flex-1">
-        <button
-          onClick={handleProgressClick}
-          className="flex-shrink-0 hover:scale-110 transition-transform"
-          aria-label={`Mark ${resource} as ${progress?.completed ? 'incomplete' : 'complete'}`}
-        >
-          {progress?.completed ? (
-            <CheckCircle2 className="w-5 h-5 text-green-400" />
-          ) : (
-            <Circle className="w-5 h-5 text-gray-400" />
-          )}
-        </button>
-        <span className="text-white/90 font-medium">{resource}</span>
-        <span className={`text-xs px-2 py-0.5 rounded font-medium ${tagColors.bg} ${tagColors.text} border ${tagColors.border}`}>
-          {tag}
+      <div className="flex items-start gap-2 flex-1 min-w-0">
+  <button
+    onClick={handleProgressClick}
+    className="flex-shrink-0 hover:scale-110 transition-transform mt-0.5"
+    aria-label={`Mark ${resource} as ${progress?.completed ? 'incomplete' : 'complete'}`}
+  >
+    {progress?.completed ? (
+      <CheckCircle2 className="w-5 h-5 text-green-400" />
+    ) : (
+      <Circle className="w-5 h-5 text-gray-400" />
+    )}
+  </button>
+  <div className="flex-1 min-w-0">
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-white/90 font-medium truncate">{resource}</span>
+      <span className={`text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap ${tagColors.bg} ${tagColors.text} border ${tagColors.border}`}>
+        {tag}
+      </span>
+      {showStage && (
+        <span className="text-xs px-2 py-0.5 rounded font-medium bg-gray-600 text-gray-200 whitespace-nowrap">
+          {stage}
         </span>
-        {showStage && (
-          <span className="text-xs px-2 py-0.5 rounded font-medium bg-gray-600 text-gray-200">
-            {stage}
-          </span>
-        )}
-      </div>
+      )}
+    </div>
+  </div>
+</div>
       <div className="flex items-center gap-2">
         {progress && (
           <div className="flex items-center gap-1 text-sm">
