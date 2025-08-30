@@ -17,11 +17,11 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: 'A-List Hub',
-  description: 'Everything you need for Narcos Life',
+  description: 'Everything you need for Narcos Life - Crafting Calculator and more premium tools.',
   keywords: 'Narcos Life, gaming tools, crafting calculator',
   authors: [{ name: 'Levy' }],
   creator: 'The A-List Team',
-  
+ 
   icons: {
     // Primary favicon with multiple sizes for optimal performance
     icon: [
@@ -29,19 +29,19 @@ export const metadata: Metadata = {
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
       { url: '/favicon.ico', sizes: '32x32' }, // Fallback ICO
     ],
-    
+   
     // Apple touch icons for iOS home screen
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
-    
+   
     // Shortcut for older browsers
     shortcut: '/favicon.ico',
   },
 
   // Web App Manifest for PWA capabilities and better mobile experience
   manifest: '/site.webmanifest',
-  
+ 
   // Enhanced OpenGraph with proper images
   openGraph: {
     title: 'A-List Hub',
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
       },
     ],
   },
-  
+ 
   // Enhanced Twitter/X metadata
   twitter: {
     card: 'summary_large_image',
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     description: 'Premium gaming tools for Narcos Life players',
     images: ['/android-chrome-512x512.png'],
   },
-  
+ 
   robots: {
     index: true,
     follow: true,
@@ -95,7 +95,7 @@ export default function RootLayout({
         {/* Performance optimizations */}
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="dns-prefetch" href="//fonts.googleapis.com" />
-        
+       
         {/* Optional: Preload critical favicon for faster loading */}
         <link rel="preload" href="/favicon-32x32.png" as="image" type="image/png" />
       </head>
