@@ -158,8 +158,26 @@ const nextConfig = {
           },
         ],
       },
+      {
+        source: '/ALIST-HUB-NARCOS.png',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=86400',
+          },
+          {
+            key: 'Content-Type',
+            value: 'image/png',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+        ],
+      },
     ]
   },
+  
   // Add experimental features for better performance
   experimental: {
     optimizePackageImports: ['lucide-react'],

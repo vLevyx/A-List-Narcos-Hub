@@ -17,8 +17,8 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: 'A-List Hub',
-  description: 'Everything you need for Narcos Life - Crafting Calculator and more premium tools.',
-  keywords: 'Narcos Life, gaming tools, crafting calculator',
+  description: 'Everything you need for Narcos Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
+  keywords: 'Narcos Life, gaming tools, crafting calculator, price planner, weapon compatibility',
   authors: [{ name: 'Levy' }],
   creator: 'The A-List Team',
  
@@ -42,28 +42,43 @@ export const metadata: Metadata = {
   // Web App Manifest for PWA capabilities and better mobile experience
   manifest: '/site.webmanifest',
  
-  // Enhanced OpenGraph with proper images
+  // DISCORD-OPTIMIZED OpenGraph (1200x630 is Discord's preferred size)
   openGraph: {
-    title: 'A-List Hub',
-    description: 'Premium gaming tools for Narcos Life players',
+    title: 'A-List Hub - Premium Narcos Life Tools',
+    description: 'Everything you need for Narcos Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
     type: 'website',
     locale: 'en_US',
+    url: 'https://your-domain.com', // Replace with your actual domain
+    siteName: 'A-List Hub',
     images: [
       {
-        url: '/android-chrome-512x512.png',
+        url: '/ALIST-HUB-NARCOS.png', // Use your existing high-quality image
+        width: 1200,
+        height: 630,
+        alt: 'A-List Hub - Premium Narcos Life Tools',
+        type: 'image/png',
+      },
+      {
+        url: '/android-chrome-512x512.png', // Fallback
         width: 512,
         height: 512,
         alt: 'A-List Hub Logo',
+        type: 'image/png',
       },
     ],
   },
  
-  // Enhanced Twitter/X metadata
+  // Discord also reads Twitter meta tags as fallback
   twitter: {
     card: 'summary_large_image',
-    title: 'A-List Hub',
-    description: 'Premium gaming tools for Narcos Life players',
-    images: ['/android-chrome-512x512.png'],
+    site: '@AListHub', // Replace with your Twitter handle if you have one
+    creator: '@AListHub',
+    title: 'A-List Hub - Premium Narcos Life Tools',
+    description: 'Everything you need for Narcos Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
+    images: {
+      url: '/ALIST-HUB-NARCOS.png',
+      alt: 'A-List Hub - Premium Narcos Life Tools',
+    },
   },
  
   robots: {
@@ -71,9 +86,21 @@ export const metadata: Metadata = {
     follow: true,
   },
 
-  // Additional metadata for better SEO
+  // Additional metadata for better SEO and social sharing
   category: 'Gaming Tools',
   applicationName: 'A-List Hub',
+  
+  // Additional tags that Discord and other platforms use
+  other: {
+    // Discord-specific optimization
+    'theme-color': '#121212',
+    // Prevent Discord from caching old images
+    'og:image:secure_url': '/ALIST-HUB-NARCOS.png',
+    // Additional social media optimization
+    'og:image:type': 'image/png',
+    'og:image:width': '1200',
+    'og:image:height': '630',
+  },
 }
 
 export const viewport: Viewport = {
@@ -96,8 +123,20 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="dns-prefetch" href="//fonts.googleapis.com" />
        
-        {/* Optional: Preload critical favicon for faster loading */}
+        {/* Preload critical favicon for faster loading */}
         <link rel="preload" href="/favicon-32x32.png" as="image" type="image/png" />
+        
+        {/* CRITICAL: Preload OpenGraph image for Discord */}
+        <link rel="preload" href="/ALIST-HUB-NARCOS.png" as="image" type="image/png" />
+        
+        {/* Additional Discord optimization meta tags */}
+        <meta property="og:image:secure_url" content="/ALIST-HUB-NARCOS.png" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        
+        {/* Prevent caching issues - add timestamp if needed during development */}
+        <meta property="og:updated_time" content={new Date().toISOString()} />
       </head>
       <body
         className={`${outfit.className} min-h-screen bg-gradient-to-br from-background-primary via-background-secondary to-background-primary`}
