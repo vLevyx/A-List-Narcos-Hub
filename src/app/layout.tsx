@@ -17,8 +17,8 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: 'A-List Hub',
-  description: 'Everything you need for Narcos Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
-  keywords: 'Narcos Life, gaming tools, crafting calculator, price planner, weapon compatibility',
+  description: 'Everything you need for Narcos Life.',
+  keywords: 'Narcos Life, gaming tools, crafting calculator',
   authors: [{ name: 'Levy' }],
   creator: 'The A-List Team',
  
@@ -45,14 +45,14 @@ export const metadata: Metadata = {
   // DISCORD-OPTIMIZED OpenGraph (1200x630 is Discord's preferred size)
   openGraph: {
     title: 'A-List Hub - Premium Narcos Life Tools',
-    description: 'Everything you need for Narcos Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
+    description: 'Everything you need for Narcos Life.',
     type: 'website',
     locale: 'en_US',
-    url: 'https://your-domain.com', // Replace with your actual domain
+    url: 'https://alistnarcos.vercel.app/',
     siteName: 'A-List Hub',
     images: [
       {
-        url: '/ALIST-HUB-NARCOS.png', // Use your existing high-quality image
+        url: '/ALIST-HUB-NARCOS.png',
         width: 1200,
         height: 630,
         alt: 'A-List Hub - Premium Narcos Life Tools',
@@ -71,10 +71,10 @@ export const metadata: Metadata = {
   // Discord also reads Twitter meta tags as fallback
   twitter: {
     card: 'summary_large_image',
-    site: '@AListHub', // Replace with your Twitter handle if you have one
+    site: '@AListHub',
     creator: '@AListHub',
     title: 'A-List Hub - Premium Narcos Life Tools',
-    description: 'Everything you need for Narcos Life - Crafting Calculator, Price Planner, Weapon Compatibility, and more premium tools.',
+    description: 'Everything you need for Narcos Life.',
     images: {
       url: '/ALIST-HUB-NARCOS.png',
       alt: 'A-List Hub - Premium Narcos Life Tools',

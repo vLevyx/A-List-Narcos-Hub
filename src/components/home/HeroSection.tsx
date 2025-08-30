@@ -154,7 +154,7 @@ export function HeroSection() {
                       </div>
                     ) : (
                       <div className="inline-flex items-center gap-3 bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/30 rounded-full px-6 py-3 backdrop-blur-sm">
-                        <Shield className="w-5 h-5 text-orange-400" />
+                        <Crown className="w-5 h-5 text-orange-400" />
                         <span className="text-orange-400 font-semibold text-lg">Premium Access Available</span>
                       </div>
                     )}

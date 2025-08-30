@@ -1,5 +1,3 @@
-// SOLUTION 1: Updated Navbar with better SVG handling and fallback options
-
 "use client"
 
 import { useState, useEffect, useRef } from "react"
