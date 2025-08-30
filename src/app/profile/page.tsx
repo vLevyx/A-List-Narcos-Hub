@@ -616,7 +616,7 @@ export default function ProfilePage() {
         icon: '🌟',
         unlocked: (() => {
           const joinDate = new Date(profile.created_at)
-          const launchStart = new Date('2025-08-30')
+          const launchStart = new Date('2025-06-30')
           const launchEnd = new Date('2025-09-30')
           return joinDate >= launchStart && joinDate <= launchEnd
         })()

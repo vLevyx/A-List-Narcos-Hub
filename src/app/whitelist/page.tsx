@@ -12,12 +12,12 @@ import { ReferralSelector } from "@/components/ui/ReferralSelector";
 
 // Configuration
 const ORIGINAL_PRICE = 250000;
-const DISCOUNT_RATE = 0.30;
+const DISCOUNT_RATE = 0.3;
 const DISCOUNTED_PRICE = ORIGINAL_PRICE * (1 - DISCOUNT_RATE);
 
 // Launch Sale Configuration
-const SALE_START = new Date('2025-08-30T00:00:00Z');
-const SALE_END = new Date('2025-09-15T23:59:59Z');
+const SALE_START = new Date("2025-08-30T00:00:00Z");
+const SALE_END = new Date("2025-09-15T23:59:59Z");
 const DISCOUNT_ENABLED = (() => {
   const now = new Date();
   return now >= SALE_START && now <= SALE_END;
@@ -96,7 +96,7 @@ export default function WhitelistPage() {
 
       // Create timeout promise
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Database query timeout')), 10000);
+        setTimeout(() => reject(new Error("Database query timeout")), 10000);
       });
 
       // Create the database query
@@ -107,10 +107,10 @@ export default function WhitelistPage() {
         .single();
 
       // Race the query against timeout
-      const result = await Promise.race([
-        queryPromise,
-        timeoutPromise
-      ]) as { data: any; error: any };
+      const result = (await Promise.race([queryPromise, timeoutPromise])) as {
+        data: any;
+        error: any;
+      };
 
       if (result.error && result.error.code !== "PGRST116") {
         console.error("Error fetching user data:", result.error);
@@ -119,7 +119,11 @@ export default function WhitelistPage() {
       }
 
       setUserData(
-        result.data || { hub_trial: false, revoked: true, trial_expiration: null }
+        result.data || {
+          hub_trial: false,
+          revoked: true,
+          trial_expiration: null,
+        }
       );
       setIsLoading(false);
     } catch (error) {
@@ -194,151 +198,156 @@ export default function WhitelistPage() {
   }, [userData, user]);
 
   // Handle form submission
-const handleSubmit = useCallback(
-  async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    setStatusMessage({ type: null, message: "" });
+      setStatusMessage({ type: null, message: "" });
 
-    if (!ign.trim()) {
-      setStatusMessage({
-        type: "error",
-        message: "❌ Please enter your in-game name.",
-      });
-      const ignInput = document.getElementById("ign") as HTMLInputElement;
-      if (ignInput) {
-        ignInput.focus();
-      }
-      return;
-    }
-
-    if (ign.trim().length < 2) {
-      setStatusMessage({
-        type: "error",
-        message: "❌ In-game name must be at least 2 characters long.",
-      });
-      return;
-    }
-
-    if (!user) {
-      setStatusMessage({
-        type: "error",
-        message: "❌ You must be logged in to request a trial.",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setStatusMessage({
-      type: "info",
-      message: "🔄 Submitting your request...",
-    });
-
-    try {
-      const discordId = getDiscordId(user);
-      const discordUsername =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        "Discord User";
-      
-      // Get Discord avatar URL
-      const discordAvatar = user.user_metadata?.avatar_url || 
-        `https://cdn.discordapp.com/avatars/${discordId}/${user.user_metadata?.picture?.split('/').pop()?.split('.')[0]}.png` ||
-        null;
-
-      if (!discordId) {
-        throw new Error("Could not determine Discord ID");
-      }
-
-      // Get authentication token
-      const { data: sessionData } = await Promise.race([
-        supabase.auth.getSession(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Session timeout')), 10000))
-      ]) as { data: any };
-      const token = sessionData.session?.access_token;
-
-      if (!token) {
-        throw new Error(
-          "Authentication token not found. Please log in again."
-        );
-      }
-
-      // Call your Edge function
-      const response = await withTimeout(
-        fetch(
-          "https://nipdvdcjiszxasjjofsn.supabase.co/functions/v1/sendWhitelistRequest",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              ign: ign.trim(),
-              discordId,
-              discordUsername,
-              discordAvatar,
-              reason: "Premium access request via whitelist form",
-              experience: "intermediate",
-              referral: referral.trim() || null,
-              referralDiscordId: referralDiscordId || null,
-            }),
-          }
-        ),
-        15000
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `Server error: ${response.status}`
-        );
-      }
-
-      setStatusMessage({
-        type: "success",
-        message: "✅ Whitelist request submitted! You now have premium access and a 7-day trial.",
-      });
-
-      setIgn("");
-      setReferral("");
-      setReferralDiscordId("");
-
-      // Refresh the page to show the new status
-      setTimeout(() => {
-        window.location.reload();
-      }, 2500);
-
-    } catch (error) {
-      console.error("Error submitting whitelist request:", error);
-
-      let errorMessage =
-        "❌ An unexpected error occurred. Please try again later.";
-
-      if (error instanceof Error) {
-        if (error.message.includes("timeout")) {
-          errorMessage =
-            "❌ Request timeout. Please check your connection and try again.";
-        } else if (error.message.includes("Discord ID")) {
-          errorMessage =
-            "❌ Authentication error. Please log out and log in again.";
-        } else if (error.message.includes("already")) {
-          errorMessage = `❌ ${error.message}`;
-        } else {
-          errorMessage = `❌ ${error.message}`;
+      if (!ign.trim()) {
+        setStatusMessage({
+          type: "error",
+          message: "❌ Please enter your in-game name.",
+        });
+        const ignInput = document.getElementById("ign") as HTMLInputElement;
+        if (ignInput) {
+          ignInput.focus();
         }
+        return;
       }
 
+      if (ign.trim().length < 2) {
+        setStatusMessage({
+          type: "error",
+          message: "❌ In-game name must be at least 2 characters long.",
+        });
+        return;
+      }
+
+      if (!user) {
+        setStatusMessage({
+          type: "error",
+          message: "❌ You must be logged in to request a trial.",
+        });
+        return;
+      }
+
+      setIsSubmitting(true);
       setStatusMessage({
-        type: "error",
-        message: errorMessage,
+        type: "info",
+        message: "🔄 Submitting your request...",
       });
-    } finally {
-      setIsSubmitting(false);
-    }
-  },
-  [ign, referral, referralDiscordId, user, supabase]
-);
+
+      try {
+        const discordId = getDiscordId(user);
+        const discordUsername =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          "Discord User";
+
+        // Get Discord avatar URL
+        const discordAvatar =
+          user.user_metadata?.avatar_url ||
+          `https://cdn.discordapp.com/avatars/${discordId}/${
+            user.user_metadata?.picture?.split("/").pop()?.split(".")[0]
+          }.png` ||
+          null;
+
+        if (!discordId) {
+          throw new Error("Could not determine Discord ID");
+        }
+
+        // Get authentication token
+        const { data: sessionData } = (await Promise.race([
+          supabase.auth.getSession(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Session timeout")), 10000)
+          ),
+        ])) as { data: any };
+        const token = sessionData.session?.access_token;
+
+        if (!token) {
+          throw new Error(
+            "Authentication token not found. Please log in again."
+          );
+        }
+
+        // Call your Edge function
+        const response = await withTimeout(
+          fetch(
+            "https://nipdvdcjiszxasjjofsn.supabase.co/functions/v1/sendWhitelistRequest",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                ign: ign.trim(),
+                discordId,
+                discordUsername,
+                discordAvatar,
+                reason: "Premium access request via whitelist form",
+                experience: "intermediate",
+                referral: referral.trim() || null,
+                referralDiscordId: referralDiscordId || null,
+              }),
+            }
+          ),
+          15000
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || `Server error: ${response.status}`
+          );
+        }
+
+        setStatusMessage({
+          type: "success",
+          message:
+            "✅ Whitelist request submitted! You now have premium access and a 7-day trial.",
+        });
+
+        setIgn("");
+        setReferral("");
+        setReferralDiscordId("");
+
+        // Refresh the page to show the new status
+        setTimeout(() => {
+          window.location.reload();
+        }, 2500);
+      } catch (error) {
+        console.error("Error submitting whitelist request:", error);
+
+        let errorMessage =
+          "❌ An unexpected error occurred. Please try again later.";
+
+        if (error instanceof Error) {
+          if (error.message.includes("timeout")) {
+            errorMessage =
+              "❌ Request timeout. Please check your connection and try again.";
+          } else if (error.message.includes("Discord ID")) {
+            errorMessage =
+              "❌ Authentication error. Please log out and log in again.";
+          } else if (error.message.includes("already")) {
+            errorMessage = `❌ ${error.message}`;
+          } else {
+            errorMessage = `❌ ${error.message}`;
+          }
+        }
+
+        setStatusMessage({
+          type: "error",
+          message: errorMessage,
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [ign, referral, referralDiscordId, user, supabase]
+  );
 
   const handleIgnChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -427,174 +436,178 @@ const handleSubmit = useCallback(
   };
 
   // Launch Sale Banner Component
-const LaunchSaleBanner = () => {
-  const [timeLeft, setTimeLeft] = useState<{
-    days: number;
-    hours: number;
-    minutes: number;
-    seconds: number;
-  } | null>(null);
+  const LaunchSaleBanner = () => {
+    const [timeLeft, setTimeLeft] = useState<{
+      days: number;
+      hours: number;
+      minutes: number;
+      seconds: number;
+    } | null>(null);
 
-  const [saleStatus, setSaleStatus] = useState<'upcoming' | 'active' | 'ended'>('ended');
+    const [saleStatus, setSaleStatus] = useState<
+      "upcoming" | "active" | "ended"
+    >("ended");
 
-  useEffect(() => {
-    const updateSaleCountdown = () => {
-      const now = new Date();
-      
-      if (now < SALE_START) {
-        // Sale hasn't started yet
-        setSaleStatus('upcoming');
-        const diff = SALE_START.getTime() - now.getTime();
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        setTimeLeft({ days, hours, minutes, seconds });
-      } else if (now >= SALE_START && now <= SALE_END) {
-        // Sale is active
-        setSaleStatus('active');
-        const diff = SALE_END.getTime() - now.getTime();
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        setTimeLeft({ days, hours, minutes, seconds });
-      } else {
-        // Sale has ended
-        setSaleStatus('ended');
-        setTimeLeft(null);
-      }
+    useEffect(() => {
+      const updateSaleCountdown = () => {
+        const now = new Date();
+
+        if (now < SALE_START) {
+          // Sale hasn't started yet
+          setSaleStatus("upcoming");
+          const diff = SALE_START.getTime() - now.getTime();
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const hours = Math.floor(
+            (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+          );
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+          setTimeLeft({ days, hours, minutes, seconds });
+        } else if (now >= SALE_START && now <= SALE_END) {
+          // Sale is active
+          setSaleStatus("active");
+          const diff = SALE_END.getTime() - now.getTime();
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const hours = Math.floor(
+            (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+          );
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+          setTimeLeft({ days, hours, minutes, seconds });
+        } else {
+          // Sale has ended
+          setSaleStatus("ended");
+          setTimeLeft(null);
+        }
+      };
+
+      updateSaleCountdown();
+      const timer = setInterval(updateSaleCountdown, 1000);
+
+      return () => clearInterval(timer);
+    }, []);
+
+    if (saleStatus === "ended") return null;
+
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        timeZone: "UTC",
+      });
     };
 
-    updateSaleCountdown();
-    const timer = setInterval(updateSaleCountdown, 1000);
+    return (
+      <div className="w-full max-w-4xl mx-auto mb-8 animate-fade-in-up">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 p-1">
+          <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 animate-pulse"></div>
+          <div className="relative bg-black/90 backdrop-blur-xl rounded-[22px] p-4 sm:p-6 lg:p-8">
+            {/* Sale Header */}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-500/30 rounded-full px-4 py-2 mb-4">
+                <span className="text-2xl animate-bounce">🔥</span>
+                <span className="text-red-300 font-bold text-sm sm:text-base uppercase tracking-wider">
+                  Launch Sale
+                </span>
+              </div>
 
-    return () => clearInterval(timer);
-  }, []);
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black mb-2 bg-gradient-to-r from-red-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+                LIMITED TIME OFFER
+              </h2>
 
-  if (saleStatus === 'ended') return null;
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      month: 'long', 
-      day: 'numeric',
-      timeZone: 'UTC'
-    });
-  };
-
-  return (
-    <div className="w-full max-w-4xl mx-auto mb-8 animate-fade-in-up">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 p-1">
-        <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 animate-pulse"></div>
-        <div className="relative bg-black/90 backdrop-blur-xl rounded-[22px] p-4 sm:p-6 lg:p-8">
-          {/* Sale Header */}
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-500/30 rounded-full px-4 py-2 mb-4">
-              <span className="text-2xl animate-bounce">🔥</span>
-              <span className="text-red-300 font-bold text-sm sm:text-base uppercase tracking-wider">
-                Launch Sale
-              </span>
+              <p className="text-white/80 text-base sm:text-lg">
+                {saleStatus === "upcoming"
+                  ? `Sale starts ${formatDate(SALE_START)}`
+                  : `Sale ends ${formatDate(SALE_END)}`}
+              </p>
             </div>
-            
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black mb-2 bg-gradient-to-r from-red-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
-              LIMITED TIME OFFER
-            </h2>
-            
-            <p className="text-white/80 text-base sm:text-lg">
-              {saleStatus === 'upcoming' 
-                ? `Sale starts ${formatDate(SALE_START)}`
-                : `Sale ends ${formatDate(SALE_END)}`
-              }
-            </p>
-          </div>
 
-          {/* Countdown Timer */}
-{timeLeft && (
-  <div className="mb-6">
-    {/* Mobile: 2x2 grid */}
-    <div className="grid grid-cols-2 gap-2 sm:hidden mb-4">
-      {[
-        { label: 'Days', value: timeLeft.days },
-        { label: 'Hours', value: timeLeft.hours }
-      ].map((item) => (
-        <div 
-          key={item.label}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-lg p-2 text-center"
-        >
-          <div className="text-lg font-black text-white mb-1">
-            {item.value.toString().padStart(2, '0')}
-          </div>
-          <div className="text-xs text-white/70 font-medium uppercase tracking-wider">
-            {item.label}
-          </div>
-        </div>
-      ))}
-    </div>
-    <div className="grid grid-cols-2 gap-2 sm:hidden">
-      {[
-        { label: 'Minutes', value: timeLeft.minutes },
-        { label: 'Seconds', value: timeLeft.seconds }
-      ].map((item) => (
-        <div 
-          key={item.label}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-lg p-2 text-center"
-        >
-          <div className="text-lg font-black text-white mb-1">
-            {item.value.toString().padStart(2, '0')}
-          </div>
-          <div className="text-xs text-white/70 font-medium uppercase tracking-wider">
-            {item.label}
-          </div>
-        </div>
-      ))}
-    </div>
-
-    {/* Tablet and Desktop: Single row */}
-    <div className="hidden sm:grid sm:grid-cols-4 gap-3 md:gap-4">
-      {[
-        { label: 'Days', value: timeLeft.days },
-        { label: 'Hours', value: timeLeft.hours },
-        { label: 'Minutes', value: timeLeft.minutes },
-        { label: 'Seconds', value: timeLeft.seconds }
-      ].map((item) => (
-        <div 
-          key={item.label}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-3 md:p-4 text-center"
-        >
-          <div className="text-xl md:text-2xl lg:text-3xl font-black text-white mb-1">
-            {item.value.toString().padStart(2, '0')}
-          </div>
-          <div className="text-xs md:text-sm text-white/70 font-medium uppercase tracking-wider">
-            {item.label}
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
-          {/* Sale Message */}
-          <div className="text-center">
-            <div className="inline-flex items-center gap-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-2xl px-6 py-4">
-              <span className="text-3xl">💰</span>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-green-300">
-                  Save 30% During Launch Week!
+            {/* Countdown Timer */}
+            {timeLeft && (
+              <div className="mb-6">
+                {/* Mobile: 2x2 grid */}
+                <div className="grid grid-cols-2 gap-2 sm:hidden mb-4">
+                  {[
+                    { label: "Days", value: timeLeft.days },
+                    { label: "Hours", value: timeLeft.hours },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-lg p-2 text-center"
+                    >
+                      <div className="text-lg font-black text-white mb-1">
+                        {item.value.toString().padStart(2, "0")}
+                      </div>
+                      <div className="text-xs text-white/70 font-medium uppercase tracking-wider">
+                        {item.label}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-green-400/80 text-sm sm:text-base">
-                  {saleStatus === 'upcoming' 
-                    ? 'Get ready for massive savings!'
-                    : 'Don\'t miss out on this exclusive offer!'
-                  }
+                <div className="grid grid-cols-2 gap-2 sm:hidden">
+                  {[
+                    { label: "Minutes", value: timeLeft.minutes },
+                    { label: "Seconds", value: timeLeft.seconds },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-lg p-2 text-center"
+                    >
+                      <div className="text-lg font-black text-white mb-1">
+                        {item.value.toString().padStart(2, "0")}
+                      </div>
+                      <div className="text-xs text-white/70 font-medium uppercase tracking-wider">
+                        {item.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Tablet and Desktop: Single row */}
+                <div className="hidden sm:grid sm:grid-cols-4 gap-3 md:gap-4">
+                  {[
+                    { label: "Days", value: timeLeft.days },
+                    { label: "Hours", value: timeLeft.hours },
+                    { label: "Minutes", value: timeLeft.minutes },
+                    { label: "Seconds", value: timeLeft.seconds },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-3 md:p-4 text-center"
+                    >
+                      <div className="text-xl md:text-2xl lg:text-3xl font-black text-white mb-1">
+                        {item.value.toString().padStart(2, "0")}
+                      </div>
+                      <div className="text-xs md:text-sm text-white/70 font-medium uppercase tracking-wider">
+                        {item.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sale Message */}
+            <div className="text-center">
+              <div className="inline-flex items-center gap-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-2xl px-6 py-4">
+                <span className="text-3xl">💰</span>
+                <div>
+                  <div className="text-xl sm:text-2xl font-bold text-green-300">
+                    Save 30% During Launch Event!
+                  </div>
+                  <div className="text-green-400/80 text-sm sm:text-base">
+                    {saleStatus === "upcoming"
+                      ? "Get ready for massive savings!"
+                      : "Don't miss out on this exclusive offer!"}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   // Status message component
   const StatusMessage = ({ status }: { status: UserStatus }) => {
@@ -778,8 +791,8 @@ const LaunchSaleBanner = () => {
                 <p className="text-white/90 text-lg leading-relaxed">
                   To help the A-List Hub Staff track referrals smoothly,{" "}
                   <strong className="text-purple-300">
-                    have your referral enter your Discord username in the "Referred By"
-                    section
+                    have your referral enter your Discord username in the
+                    "Referred By" section
                   </strong>{" "}
                   of the{" "}
                   <strong className="text-purple-400">
@@ -976,10 +989,10 @@ const LaunchSaleBanner = () => {
           </div>
 
           {/* Launch Sale Banner */}
-<LaunchSaleBanner />
+          <LaunchSaleBanner />
 
-{/* Main Card */}
-<div className="w-full max-w-4xl glass-card rounded-3xl overflow-hidden shadow-2xl animate-fade-in-up-delayed">
+          {/* Main Card */}
+          <div className="w-full max-w-4xl glass-card rounded-3xl overflow-hidden shadow-2xl animate-fade-in-up-delayed">
             {/* Gradient border effect */}
             <div className="relative p-1 bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 rounded-3xl">
               <div className="bg-black/80 backdrop-blur-xl rounded-[22px] p-4 sm:p-6 md:p-8 lg:p-12">
@@ -1015,40 +1028,40 @@ const LaunchSaleBanner = () => {
                   <div className="space-y-4 sm:space-y-6">
                     {/* Pricing Card - Mobile Optimized */}
                     <div className="bg-gradient-to-br from-purple-400/10 to-purple-600/10 border border-purple-400/30 rounded-2xl p-4 sm:p-6 text-center relative overflow-hidden">
-  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"></div>
-  <div className="relative z-10">
-    <h4 className="text-purple-400 text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
-      💎 Premium Price
-    </h4>
-    <div className="text-2xl sm:text-3xl lg:text-4xl font-black text-white mb-2">
-      <div
-        className={`break-words ${
-          DISCOUNT_ENABLED
-            ? "line-through opacity-60 text-xl sm:text-2xl"
-            : ""
-        }`}
-      >
-        ${ORIGINAL_PRICE.toLocaleString()}
-      </div>
-      {DISCOUNT_ENABLED && (
-        <div className="text-purple-400 mt-2">
-          <div className="break-words">
-            ${DISCOUNTED_PRICE.toLocaleString()}
-          </div>
-          <span className="inline-block bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-semibold px-2 py-1 sm:px-3 sm:py-1 rounded-full mt-2 animate-bounce">
-  🔥 LAUNCH SALE - 30% OFF
-</span>
-        </div>
-      )}
-    </div>
-    {/* Currency Note */}
-    <div className="mt-3 px-3 py-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl">
-      <p className="text-amber-300 text-xs sm:text-sm font-medium break-words">
-        💰 In-game (Narcos Life RP) currency only
-      </p>
-    </div>
-  </div>
-</div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer"></div>
+                      <div className="relative z-10">
+                        <h4 className="text-purple-400 text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
+                          💎 Premium Price
+                        </h4>
+                        <div className="text-2xl sm:text-3xl lg:text-4xl font-black text-white mb-2">
+                          <div
+                            className={`break-words ${
+                              DISCOUNT_ENABLED
+                                ? "line-through opacity-60 text-xl sm:text-2xl"
+                                : ""
+                            }`}
+                          >
+                            ${ORIGINAL_PRICE.toLocaleString()}
+                          </div>
+                          {DISCOUNT_ENABLED && (
+                            <div className="text-purple-400 mt-2">
+                              <div className="break-words">
+                                ${DISCOUNTED_PRICE.toLocaleString()}
+                              </div>
+                              <span className="inline-block bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-semibold px-2 py-1 sm:px-3 sm:py-1 rounded-full mt-2 animate-bounce">
+                                🔥 LAUNCH SALE - 30% OFF
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {/* Currency Note */}
+                        <div className="mt-3 px-3 py-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl">
+                          <p className="text-amber-300 text-xs sm:text-sm font-medium break-words">
+                            💰 In-game (Narcos Life RP) currency only
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Trial Bonus - Mobile Optimized */}
                     <div className="bg-gradient-to-br from-purple-500/10 to-violet-500/10 border border-purple-500/30 rounded-2xl p-4 sm:p-6 text-center">
@@ -1181,33 +1194,33 @@ const LaunchSaleBanner = () => {
                       </div>
 
                       <button
-  type="submit"
-  disabled={isSubmitting || !ign.trim()}
-  className="group relative w-full py-4 sm:py-6 px-6 sm:px-8 bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 text-white font-black text-lg sm:text-xl uppercase tracking-wider rounded-2xl shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 overflow-hidden focus:outline-none focus:ring-4 focus:ring-purple-500/30"
-  aria-label={
-    isSubmitting
-      ? "Submitting whitelist request"
-      : "Submit whitelist request"
-  }
->
-  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-shimmer"></span>
-  <span className="relative z-10 flex items-center justify-center gap-3 flex-wrap">
-    {isSubmitting ? (
-      <>
-        <div
-          className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-t-2 border-b-2 border-white"
-          aria-hidden="true"
-        ></div>
-        <span>Processing Whitelist...</span>
-      </>
-    ) : (
-      <>
-        <span aria-hidden="true">🚀</span>
-        <span>Activate Premium Trial</span>
-      </>
-    )}
-  </span>
-</button>
+                        type="submit"
+                        disabled={isSubmitting || !ign.trim()}
+                        className="group relative w-full py-4 sm:py-6 px-6 sm:px-8 bg-gradient-to-r from-purple-400 via-purple-500 to-purple-600 text-white font-black text-lg sm:text-xl uppercase tracking-wider rounded-2xl shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 overflow-hidden focus:outline-none focus:ring-4 focus:ring-purple-500/30"
+                        aria-label={
+                          isSubmitting
+                            ? "Submitting whitelist request"
+                            : "Submit whitelist request"
+                        }
+                      >
+                        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-shimmer"></span>
+                        <span className="relative z-10 flex items-center justify-center gap-3 flex-wrap">
+                          {isSubmitting ? (
+                            <>
+                              <div
+                                className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-t-2 border-b-2 border-white"
+                                aria-hidden="true"
+                              ></div>
+                              <span>Processing Whitelist...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span aria-hidden="true">🚀</span>
+                              <span>Activate Premium Trial</span>
+                            </>
+                          )}
+                        </span>
+                      </button>
 
                       {statusMessage.type && (
                         <div
